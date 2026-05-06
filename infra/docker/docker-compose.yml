@@ -1,0 +1,164 @@
+name: message2
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: message2
+      POSTGRES_USER: message2
+      POSTGRES_DB: message2
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U message2 -d message2"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    ports:
+      - "${MESSAGE2_POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9000/minio/health/live >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  api-gateway:
+    image: node:20
+    working_dir: /app
+    volumes:
+      - ../..:/app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/api-gateway dev"
+    depends_on:
+      messaging:
+        condition: service_healthy
+      media:
+        condition: service_healthy
+      notifications:
+        condition: service_healthy
+      access-audit:
+        condition: service_healthy
+    environment:
+      PORT: "4000"
+      MESSAGING_URL: http://messaging:4001
+      MEDIA_URL: http://media:4002
+      NOTIFICATIONS_URL: http://notifications:4003
+      AUDIT_URL: http://access-audit:4004
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    ports:
+      - "4000:4000"
+
+  messaging:
+    image: node:22
+    working_dir: /app
+    volumes:
+      - ../..:/app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/messaging dev"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: "4001"
+      DATABASE_URL: postgresql://message2:message2@postgres:5432/message2
+      JWT_SECRET: ${MESSAGE2_JWT_SECRET:-change-me-in-production}
+      KEY_PROVIDER: env
+      DATA_ENCRYPTION_MASTER_KEY: ${MESSAGE2_DATA_ENCRYPTION_MASTER_KEY:-change-me-in-production}
+      ENCRYPTION_KEY_VERSION: "1"
+      ONBOARDING_BOT_USERNAME: ${MESSAGE2_ONBOARDING_BOT_USERNAME:-message2_bot}
+      ONBOARDING_BOT_DISPLAY_NAME: ${MESSAGE2_ONBOARDING_BOT_DISPLAY_NAME:-Послание 2}
+      ONBOARDING_WELCOME_CHAT_TITLE: ${MESSAGE2_ONBOARDING_WELCOME_CHAT_TITLE:-Послание 2}
+      ONBOARDING_SAVED_CHAT_TITLE: ${MESSAGE2_ONBOARDING_SAVED_CHAT_TITLE:-Сохранённое}
+      ONBOARDING_WELCOME_TEXT: ${MESSAGE2_ONBOARDING_WELCOME_TEXT:-Добро пожаловать в Послание 2! Здесь можно быстро начать общение и проверить, что всё работает.}
+      ONBOARDING_WELCOME_TEXT_RU: ${MESSAGE2_ONBOARDING_WELCOME_TEXT_RU:-Добро пожаловать в Послание 2! Здесь можно быстро начать общение и проверить, что всё работает.}
+      ONBOARDING_WELCOME_TEXT_EN: ${MESSAGE2_ONBOARDING_WELCOME_TEXT_EN:-Welcome to Message 2! This chat helps you get started and verify everything works.}
+    ports:
+      - "4001:4001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4001/health/ready >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 25s
+
+  media:
+    image: node:22
+    working_dir: /app
+    volumes:
+      - ../..:/app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/media dev"
+    environment:
+      PORT: "4002"
+      JWT_SECRET: ${MESSAGE2_JWT_SECRET:-change-me-in-production}
+    ports:
+      - "4002:4002"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4002/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  notifications:
+    image: node:22
+    working_dir: /app
+    volumes:
+      - ../..:/app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/notifications dev"
+    environment:
+      PORT: "4003"
+    ports:
+      - "4003:4003"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4003/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  access-audit:
+    image: node:22
+    working_dir: /app
+    volumes:
+      - ../..:/app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/access-audit dev"
+    environment:
+      PORT: "4004"
+      JWT_SECRET: ${MESSAGE2_JWT_SECRET:-change-me-in-production}
+    ports:
+      - "4004:4004"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4004/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  pg_data:

@@ -1,0 +1,27 @@
+---
+description: Immutable coursework topic and context discipline
+alwaysApply: true
+---
+
+# Coursework Context Guardrail
+
+## Immutable Topic
+
+This project is developed under the fixed coursework theme:
+"Design of a secure client-server application for messaging and multimedia exchange with deployment capability in corporate and public environments."
+
+Do not change or reinterpret this core topic.
+
+## Response Framing
+
+- Keep recommendations aligned with secure architecture goals.
+- Prefer solutions that support both public and corporate deployment profiles.
+- When proposing auth, policy, observability, or deployment decisions, explain how they fit both profiles.
+
+## Mutable Context Source
+
+- Treat `docs/ai-context.md` as the current source for:
+  - implementation status
+  - current constraints
+  - planned next steps
+- If that file conflicts with older chat memory, prefer the file.

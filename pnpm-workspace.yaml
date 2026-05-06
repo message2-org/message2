@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - services/*
+  - packages/*
+allowBuilds:
+  '@prisma/client': false
+  '@prisma/engines': false
+  argon2: false
+  esbuild: false
+  prisma: false

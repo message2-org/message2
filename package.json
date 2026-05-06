@@ -1,0 +1,23 @@
+{
+  "name": "message2",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "setup:env": "node scripts/setup-envs.mjs",
+    "postinstall": "pnpm setup:env",
+    "predev": "pnpm setup:env",
+    "infra:up": "docker compose -f infra/docker/docker-compose.yml up -d postgres redis minio",
+    "infra:down": "docker compose -f infra/docker/docker-compose.yml down",
+    "infra:reset": "docker compose -f infra/docker/docker-compose.yml down -v && docker compose -f infra/docker/docker-compose.yml up -d postgres redis minio",
+    "db:migrate": "pnpm --filter @message2/messaging prisma:migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @message2/messaging prisma:migrate:deploy",
+    "dev:full": "pnpm infra:up && pnpm db:migrate:deploy && pnpm dev",
+    "dev": "concurrently \"pnpm --filter @message2/api-gateway dev\" \"pnpm --filter @message2/messaging dev\" \"pnpm --filter @message2/media dev\" \"pnpm --filter @message2/notifications dev\" \"pnpm --filter @message2/access-audit dev\" \"pnpm --filter @message2/web dev\"",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3"
+  }
+}
