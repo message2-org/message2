@@ -5,6 +5,17 @@ export const localeOptions: Record<Locale, { label: string; flag: string }> = {
   en: { label: "English", flag: "/icons/flag-us.svg" }
 };
 
+const preloadedLocaleFlags = new Set<string>();
+
+export function preloadLocaleFlags(): void {
+  for (const option of Object.values(localeOptions)) {
+    if (preloadedLocaleFlags.has(option.flag)) continue;
+    preloadedLocaleFlags.add(option.flag);
+    const img = new Image();
+    img.src = option.flag;
+  }
+}
+
 export const copy = {
   ru: {
     brand: "Послание2",

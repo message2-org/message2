@@ -32,7 +32,15 @@ export type Message = {
   text: string;
   time: string;
   createdAt?: string;
+  mediaId?: string;
   preview?: string;
   previewType?: "image" | "video" | "audio" | "file";
   fileName?: string;
+};
+
+export type PendingAttachment = {
+  mediaId: string;
+  type: "image" | "video" | "audio" | "file";
+  name: string;
+  localPreview: string;
 };

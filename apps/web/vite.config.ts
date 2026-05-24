@@ -9,6 +9,10 @@ export default defineConfig({
       "/messaging": {
         target: "http://localhost:4000",
         changeOrigin: true
+      },
+      "/media": {
+        target: "http://localhost:4000",
+        changeOrigin: true
       }
     }
   }

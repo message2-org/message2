@@ -270,8 +270,11 @@ export function SidebarDiscovery(props: Props) {
                             .then(() => {
                               onCloseDiscovery();
                             })
-                            .catch(() => {
-                              setOpenDirectChatError(locale === "ru" ? "Не удалось открыть чат. Попробуйте еще раз." : "Unable to open chat. Please try again.");
+                            .catch((error: unknown) => {
+                              const fallback = locale === "ru" ? "Не удалось открыть чат. Попробуйте еще раз." : "Unable to open chat. Please try again.";
+                              const message = error instanceof Error && error.message ? error.message : fallback;
+                              setOpenDirectChatError(message);
+                              console.error("[discovery/open-direct-chat]", error);
                             })
                             .finally(() => {
                               setOpeningUserId(null);

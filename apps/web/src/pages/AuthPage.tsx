@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { buildAvatarGradient, buildUserInitials } from "../lib/avatar";
 import { copy, localeOptions, Locale } from "../i18n";
 import { AuthMode } from "../types";
-import { BrandLogo, CameraIcon, GitHubMark } from "../components/ui-icons";
+import { BrandLogo, GitHubMark } from "../components/ui-icons";
 
 type AuthPageProps = {
   theme: "light" | "dark";
@@ -13,7 +14,7 @@ type AuthPageProps = {
   username: string;
   password: string;
   confirmPassword: string;
-  registerAvatar: string | null;
+  registerAvatarPreview: string | null;
   displayNameError?: string;
   usernameError?: string;
   passwordError?: string;
@@ -56,7 +57,7 @@ export function AuthPage(props: AuthPageProps) {
     username,
     password,
     confirmPassword,
-    registerAvatar,
+    registerAvatarPreview,
     displayNameError,
     usernameError,
     passwordError,
@@ -85,6 +86,9 @@ export function AuthPage(props: AuthPageProps) {
   const t = copy[locale];
   const localeFlagIcon = localeOptions[locale].flag;
   const themeIcon = theme === "dark" ? "/icons/moon.svg" : "/icons/sun.svg";
+  const registerAvatarSeed = username.trim().toLowerCase() || "user";
+  const registerAutoInitials = buildUserInitials(displayName, username);
+  const registerAutoGradient = buildAvatarGradient(registerAvatarSeed);
   const [loadingStep, setLoadingStep] = useState(0);
   const [loadingDots, setLoadingDots] = useState(1);
   const loadingLines = useMemo(
@@ -178,12 +182,17 @@ export function AuthPage(props: AuthPageProps) {
           {authMode === "register" ? (
             <div className="auth-register-avatar">
               <div className="auth-avatar-picker-wrap">
-                <label className="auth-avatar-picker">
-                  <input type="file" accept="image/*" onChange={(event) => onRegisterAvatarUpload(event.target.files?.[0] ?? null)} />
-                  {registerAvatar ? <img src={registerAvatar} alt="" /> : <CameraIcon />}
-                  {!registerAvatar ? <span>{locale === "ru" ? "Аватар" : "Avatar"}</span> : null}
+                <label className="auth-avatar-picker" title={locale === "ru" ? "Загрузить фото" : "Upload photo"}>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onRegisterAvatarUpload(event.target.files?.[0] ?? null)} />
+                  {registerAvatarPreview ? (
+                    <img src={registerAvatarPreview} alt="" />
+                  ) : (
+                    <span className="chat-avatar profile-auto-avatar" style={{ backgroundImage: registerAutoGradient }}>
+                      {registerAutoInitials}
+                    </span>
+                  )}
                 </label>
-                {registerAvatar ? (
+                {registerAvatarPreview ? (
                   <button type="button" className="auth-avatar-clear" onClick={onRegisterAvatarReset} aria-label={locale === "ru" ? "Удалить фото" : "Remove photo"}>
                     ×
                   </button>

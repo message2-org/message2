@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import EmojiPicker, { type EmojiClickData } from "emoji-picker-react";
+import { buildAvatarGradient, buildUserInitials } from "../lib/avatar";
 import { copy, localeOptions, Locale } from "../i18n";
 import { chatMatchesSearch } from "../search-utils";
-import { AuthUser, ChatItem, Message } from "../types";
+import { AuthUser, ChatItem, Message, PendingAttachment } from "../types";
 import { SidebarDiscovery, type DiscoveryTabId } from "../components/SidebarDiscovery";
 import {
   ArchiveIcon,
@@ -45,10 +46,14 @@ type ChatPageProps = {
   locale: Locale;
   theme: "light" | "dark";
   authUser: AuthUser;
+  /** Resolved URL for `<img>` (blob, data, or https). */
   userAvatar: string | null;
+  /** Stored profile value (`media:<id>`, legacy data URL, or null). */
+  userAvatarRef: string | null;
   isMenuOpen: boolean;
   /** True only after the realtime channel was open and then dropped (not during initial connect). */
   isRealtimeReconnecting: boolean;
+  isRealtimeConnected: boolean;
   search: string;
   discoverUsers: { id: string; username: string; displayName: string }[];
   discoverJoinedChannels: { id: string; name: string; subscribers: number }[];
@@ -63,7 +68,8 @@ type ChatPageProps = {
   onOpenDirectChat: (user: { id: string; username: string; displayName: string }) => void | Promise<void>;
   onSearchChange: (value: string) => void;
   onInputChange: (value: string) => void;
-  onSendMessage: (attachment?: { url: string; type: "image" | "video" | "audio" | "file"; name: string }) => void;
+  onPrepareAttachment: (file: File) => Promise<PendingAttachment>;
+  onSendMessage: (attachment?: PendingAttachment) => void;
   onLogout: () => void;
   onThemeToggle: () => void;
   onLocaleSelect: (next: Locale) => void;
@@ -85,8 +91,10 @@ export function ChatPage(props: ChatPageProps) {
     theme,
     authUser,
     userAvatar,
+    userAvatarRef,
     isMenuOpen,
     isRealtimeReconnecting,
+    isRealtimeConnected,
     search,
     discoverUsers,
     discoverJoinedChannels,
@@ -101,6 +109,7 @@ export function ChatPage(props: ChatPageProps) {
     onOpenDirectChat,
     onSearchChange,
     onInputChange,
+    onPrepareAttachment,
     onSendMessage,
     onLogout,
     onThemeToggle,
@@ -135,7 +144,9 @@ export function ChatPage(props: ChatPageProps) {
   const [chatContextMenu, setChatContextMenu] = useState<{ chatId: string; x: number; y: number } | null>(null);
   const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
-  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: "image" | "video" | "audio" | "file"; name: string } | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
+  const [isAttachmentUploading, setIsAttachmentUploading] = useState(false);
+  const [attachmentUploadError, setAttachmentUploadError] = useState("");
   const [chatDescriptions, setChatDescriptions] = useState<Record<string, string>>({});
   const [chatDisplayAliases, setChatDisplayAliases] = useState<Record<string, string>>({});
   const [chatInfoAvatars, setChatInfoAvatars] = useState<Record<string, string>>({});
@@ -388,6 +399,12 @@ export function ChatPage(props: ChatPageProps) {
   function senderInitial(author: string) {
     return author.trim().slice(0, 1).toUpperCase() || "?";
   }
+  function isEmojiOnlyText(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    const withoutEmojiTokens = trimmed.replace(/[\p{Extended_Pictographic}\uFE0F\u200D\u{1F3FB}-\u{1F3FF}\s]/gu, "");
+    return withoutEmojiTokens.length === 0;
+  }
   function resizeComposerInput() {
     if (!composerInputRef.current) return;
     composerInputRef.current.style.height = "0px";
@@ -398,10 +415,60 @@ export function ChatPage(props: ChatPageProps) {
     onInputChange(value);
     requestAnimationFrame(resizeComposerInput);
   }
+  function submitComposerMessage() {
+    if (!input.trim() && !pendingAttachment) return;
+    onSendMessage(pendingAttachment ?? undefined);
+    clearPendingAttachment();
+    requestAnimationFrame(() => {
+      if (!composerInputRef.current) return;
+      composerInputRef.current.style.height = "0px";
+    });
+  }
+  function handleComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    submitComposerMessage();
+  }
   function onEmojiPick(emoji: EmojiClickData) {
     onInputChange(`${input}${emoji.emoji}`);
     setIsEmojiOpen(false);
     requestAnimationFrame(resizeComposerInput);
+  }
+  function clearPendingAttachment() {
+    if (pendingAttachment) {
+      URL.revokeObjectURL(pendingAttachment.localPreview);
+    }
+    setPendingAttachment(null);
+    setAttachmentUploadError("");
+  }
+
+  async function attachFile(file: File) {
+    setIsAttachmentUploading(true);
+    setAttachmentUploadError("");
+    try {
+      const prepared = await onPrepareAttachment(file);
+      setPendingAttachment((prev) => {
+        if (prev) URL.revokeObjectURL(prev.localPreview);
+        return prepared;
+      });
+      setIsAttachMenuOpen(false);
+    } catch {
+      setAttachmentUploadError(locale === "ru" ? "Не удалось загрузить файл" : "Failed to upload file");
+    } finally {
+      setIsAttachmentUploading(false);
+    }
+  }
+  function pendingAttachmentLabel(type: "image" | "video" | "audio" | "file") {
+    if (locale === "ru") {
+      if (type === "image") return "Изображение";
+      if (type === "video") return "Видео";
+      if (type === "audio") return "Аудио";
+      return "Файл";
+    }
+    if (type === "image") return "Image";
+    if (type === "video") return "Video";
+    if (type === "audio") return "Audio";
+    return "File";
   }
   function requestLogout() {
     setIsLogoutConfirmOpen(true);
@@ -540,16 +607,10 @@ export function ChatPage(props: ChatPageProps) {
     setActiveSubmenu(kind);
   }
   function userInitials() {
-    const value = (authUser.displayName || authUser.username || "U").trim();
-    const words = value.split(/\s+/).filter(Boolean);
-    return words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "U";
+    return buildUserInitials(authUser.displayName, authUser.username);
   }
   function userAvatarGradient() {
-    let hash = 0;
-    const id = authUser.id || authUser.username;
-    for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) | 0;
-    const hue = Math.abs(hash) % 360;
-    return `linear-gradient(145deg, hsl(${hue} 68% 58%), hsl(${hue} 68% 40%))`;
+    return buildAvatarGradient(authUser.id || authUser.username);
   }
   function deliveryText(chat: ChatItem) {
     if (chat.lastSenderType !== "me") return "";
@@ -900,6 +961,10 @@ export function ChatPage(props: ChatPageProps) {
                 </>
               )}
             </div>
+            <div className={`realtime-badge ${isRealtimeConnected ? "realtime-badge--ok" : "realtime-badge--polling"}`} title={isRealtimeConnected ? "Realtime: WebSocket connected" : "Realtime: fallback polling"}>
+              <span className="realtime-badge__dot" aria-hidden />
+              <span>{isRealtimeConnected ? (locale === "ru" ? "Онлайн" : "Live") : (locale === "ru" ? "Опрос" : "Polling")}</span>
+            </div>
           </header>
         )}
 
@@ -1169,6 +1234,7 @@ export function ChatPage(props: ChatPageProps) {
                 const isFirstInSeries = !prev || prev.sender !== message.sender;
                 const isLastInSeries = !next || next.sender !== message.sender;
                 const dayLabel = messageDateLabel(message, prev);
+                const isEmojiOnly = isEmojiOnlyText(message.text) && !message.preview;
                 const mediaNode = message.preview ? (
                   message.previewType === "video" ? (
                     <video src={message.preview} className="message__preview" controls />
@@ -1188,7 +1254,7 @@ export function ChatPage(props: ChatPageProps) {
                     {message.sender === "me" ? (
                       <article className="message message--me">
                         {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
-                        <p>{message.text}</p>
+                        <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>
                         {mediaNode}
                         <p className="message__time">{message.time}</p>
                       </article>
@@ -1199,7 +1265,7 @@ export function ChatPage(props: ChatPageProps) {
                         </div>
                         <article className="message">
                           {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
-                          <p>{message.text}</p>
+                          <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>
                           {mediaNode}
                           <p className="message__time">{message.time}</p>
                         </article>
@@ -1219,13 +1285,7 @@ export function ChatPage(props: ChatPageProps) {
             className="composer"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!input.trim() && !pendingAttachment) return;
-              onSendMessage(pendingAttachment ?? undefined);
-              setPendingAttachment(null);
-              requestAnimationFrame(() => {
-                if (!composerInputRef.current) return;
-                composerInputRef.current.style.height = "0px";
-              });
+              submitComposerMessage();
             }}
           >
             <div className="composer__emoji-wrap" ref={emojiRef}>
@@ -1243,11 +1303,49 @@ export function ChatPage(props: ChatPageProps) {
                 </div>
               ) : null}
             </div>
+            {pendingAttachment ? (
+              <div className="composer__pending-attachment">
+                <div className="composer__pending-preview">
+                  {pendingAttachment.type === "image" ? (
+                    <img src={pendingAttachment.localPreview} alt={pendingAttachment.name} className="composer__pending-preview-media" />
+                  ) : pendingAttachment.type === "video" ? (
+                    <video src={pendingAttachment.localPreview} className="composer__pending-preview-media" muted />
+                  ) : pendingAttachment.type === "audio" ? (
+                    <span className="composer__pending-icon-wrap">
+                      <MicIcon />
+                    </span>
+                  ) : (
+                    <span className="composer__pending-icon-wrap">
+                      <FileIcon />
+                    </span>
+                  )}
+                </div>
+                <div className="composer__pending-meta">
+                  <p className="composer__pending-name">{pendingAttachment.name}</p>
+                  <p className="composer__pending-type">{pendingAttachmentLabel(pendingAttachment.type)}</p>
+                </div>
+                <button
+                  type="button"
+                  className="icon-button composer__pending-remove"
+                  onClick={clearPendingAttachment}
+                  aria-label={locale === "ru" ? "Удалить вложение" : "Remove attachment"}
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
+            {isAttachmentUploading ? (
+              <p className="composer__upload-status" role="status">
+                {locale === "ru" ? "Загрузка файла…" : "Uploading file…"}
+              </p>
+            ) : null}
+            {attachmentUploadError ? <p className="composer__upload-error">{attachmentUploadError}</p> : null}
             <div className="composer__input-wrap" ref={attachMenuRef}>
               <textarea
                 ref={composerInputRef}
                 value={input}
                 onChange={(event) => handleComposerChange(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
                 placeholder={t.messagePlaceholder}
                 rows={1}
               />
@@ -1263,11 +1361,12 @@ export function ChatPage(props: ChatPageProps) {
                       type="file"
                       className="composer-file-input"
                       accept="image/*,video/*"
+                      disabled={isAttachmentUploading}
                       onChange={(event) => {
                         const file = event.target.files?.[0];
+                        event.target.value = "";
                         if (!file) return;
-                        setPendingAttachment({ url: URL.createObjectURL(file), type: file.type.startsWith("video/") ? "video" : "image", name: file.name });
-                        setIsAttachMenuOpen(false);
+                        void attachFile(file);
                       }}
                     />
                   </label>
@@ -1277,12 +1376,12 @@ export function ChatPage(props: ChatPageProps) {
                     <input
                       type="file"
                       className="composer-file-input"
+                      disabled={isAttachmentUploading}
                       onChange={(event) => {
                         const file = event.target.files?.[0];
+                        event.target.value = "";
                         if (!file) return;
-                        const type: "audio" | "file" = file.type.startsWith("audio/") ? "audio" : "file";
-                        setPendingAttachment({ url: URL.createObjectURL(file), type, name: file.name });
-                        setIsAttachMenuOpen(false);
+                        void attachFile(file);
                       }}
                     />
                   </label>
@@ -1313,10 +1412,10 @@ export function ChatPage(props: ChatPageProps) {
                 <label className="auth-avatar-picker auth-avatar-picker--profile" title={locale === "ru" ? "Изменить фото" : "Change photo"}>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     onChange={(event) => onUploadAvatar(event.target.files?.[0] ?? null)}
                   />
-                  {userAvatar?.startsWith("data:image/") ? (
+                  {userAvatar ? (
                     <img src={userAvatar} alt="" />
                   ) : (
                     <span className="chat-avatar profile-auto-avatar" style={{ backgroundImage: userAvatarGradient() }}>
@@ -1327,7 +1426,7 @@ export function ChatPage(props: ChatPageProps) {
                     <PencilIcon />
                   </span>
                 </label>
-                {userAvatar ? (
+                {userAvatarRef ? (
                   <button
                     type="button"
                     className="auth-avatar-clear"

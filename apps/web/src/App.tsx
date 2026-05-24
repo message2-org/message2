@@ -1,8 +1,11 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { copy, Locale } from "./i18n";
+import { copy, Locale, preloadLocaleFlags } from "./i18n";
 import { AuthPage } from "./pages/AuthPage";
 import { ChatPage } from "./pages/ChatPage";
-import { AuthMode, AuthUser, ChatItem, Message } from "./types";
+import { uploadAvatarMediaRef } from "./lib/avatar";
+import { fetchMediaBlobUrl, uploadMediaFile } from "./lib/media";
+import { useResolvedAvatarUrl } from "./hooks/useResolvedAvatarUrl";
+import { AuthMode, AuthUser, ChatItem, Message, PendingAttachment } from "./types";
 
 const API_BASE_URLS = ["/messaging", "http://localhost:4000/messaging", "http://localhost:4001"] as const;
 const USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -18,6 +21,7 @@ type StoredSession = {
   accessToken: string;
   refreshToken: string;
 };
+type MessagePreviewMeta = Pick<Message, "preview" | "previewType" | "fileName">;
 type ChatApiResponseItem = {
   id: string;
   title: string;
@@ -33,6 +37,22 @@ type MessageApiResponseItem = {
   sentAt: string;
   senderDisplayName?: string;
 };
+type AttachmentPayload = {
+  kind: "attachment";
+  text: string;
+  mediaId?: string;
+  preview?: string;
+  previewType: "image" | "video" | "audio" | "file";
+  fileName?: string;
+};
+
+function inferPreviewTypeFromDataUrl(value: string): "image" | "video" | "audio" | "file" | null {
+  if (!value.startsWith("data:")) return null;
+  if (value.startsWith("data:image/")) return "image";
+  if (value.startsWith("data:video/")) return "video";
+  if (value.startsWith("data:audio/")) return "audio";
+  return "file";
+}
 type DiscoverApiResponse = {
   users: { id: string; username: string; displayName: string }[];
   joinedChannels: { id: string; name: string; subscribers: number }[];
@@ -102,7 +122,44 @@ function clearStoredSession() {
   localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
-async function requestAuth(mode: AuthMode, payload: { displayName?: string; username: string; password: string }, locale: Locale) {
+function translateAuthBackendMessage(message: string, locale: Locale): string {
+  if (locale !== "ru") return message;
+  return message
+    .replace("username and password are required", "Требуются имя пользователя и пароль")
+    .replace("username already exists", "Такое имя пользователя уже существует")
+    .replace("invalid credentials", "Неверные учетные данные")
+    .replace("failed to register user", "Не удалось зарегистрировать пользователя")
+    .replace("invalid avatar", "Некорректное изображение аватара");
+}
+
+function mapAuthTransportError(message: string, locale: Locale): string {
+  const isProxyFailure =
+    /Error occurred while trying to proxy/i.test(message) ||
+    /Unexpected token/i.test(message) ||
+    /is not valid JSON/i.test(message);
+  if (isProxyFailure) {
+    return locale === "ru"
+      ? "Сервис сообщений недоступен. Выполните pnpm infra:up и перезапустите pnpm dev."
+      : "Messaging service is unavailable. Run pnpm infra:up and restart pnpm dev.";
+  }
+  return translateAuthBackendMessage(message, locale);
+}
+
+async function readAuthResponseBody(response: Response): Promise<Record<string, unknown>> {
+  const text = (await response.text()).trim();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(text);
+  }
+}
+
+async function requestAuth(
+  mode: AuthMode,
+  payload: { displayName?: string; username: string; password: string; avatarUrl?: string | null },
+  locale: Locale
+) {
   const endpoint = mode === "login" ? "/auth/login" : "/auth/register";
   let lastError: Error | null = null;
 
@@ -116,22 +173,15 @@ async function requestAuth(mode: AuthMode, payload: { displayName?: string; user
         body: JSON.stringify(payload),
         signal: controller.signal
       });
-      const data = await response.json();
+      const data = await readAuthResponseBody(response);
       if (!response.ok) {
         const backendMessage = String(data.error ?? "Auth request failed");
-        const translatedMessage =
-          locale === "ru"
-            ? backendMessage
-                .replace("username and password are required", "Требуются имя пользователя и пароль")
-                .replace("username already exists", "Такое имя пользователя уже существует")
-                .replace("invalid credentials", "Неверные учетные данные")
-            : backendMessage;
-        throw new Error(translatedMessage);
+        throw new Error(mapAuthTransportError(backendMessage, locale));
       }
       return data as AuthApiResponse;
     } catch (error) {
       if (error instanceof Error && error.name !== "AbortError" && error.message !== "Failed to fetch") {
-        throw error;
+        throw new Error(mapAuthTransportError(error.message, locale));
       }
       lastError = error instanceof Error ? error : new Error("Auth request failed");
     } finally {
@@ -168,19 +218,31 @@ async function requestMe(accessToken: string) {
 }
 
 async function requestWithAuth(path: string, accessToken: string, init?: RequestInit) {
+  let lastNetworkError: Error | null = null;
   for (const baseUrl of API_BASE_URLS) {
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      headers: {
-        ...(init?.headers ?? {}),
-        Authorization: `Bearer ${accessToken}`
+    try {
+      const response = await fetch(`${baseUrl}${path}`, {
+        ...init,
+        headers: {
+          ...(init?.headers ?? {}),
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+      if (response.status === 401) throw new Error(UNAUTHORIZED_ERROR);
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        const backendError = String(payload.error ?? `HTTP ${response.status}`);
+        if (response.status >= 500) continue;
+        throw new Error(backendError);
       }
-    });
-    if (response.status === 401) throw new Error(UNAUTHORIZED_ERROR);
-    if (!response.ok) continue;
-    return response;
+      return response;
+    } catch (error) {
+      if (error instanceof Error && error.message === UNAUTHORIZED_ERROR) throw error;
+      if (error instanceof Error && error.message !== "Failed to fetch") throw error;
+      lastNetworkError = error instanceof Error ? error : new Error("Request failed");
+    }
   }
-  throw new Error("Request failed");
+  throw lastNetworkError ?? new Error("Request failed");
 }
 
 async function requestChats(accessToken: string) {
@@ -193,11 +255,30 @@ async function requestMessages(accessToken: string, chatId: string) {
   return (await response.json()) as MessageApiResponseItem[];
 }
 
-async function requestSendMessage(accessToken: string, chatId: string, text: string) {
+async function requestSendMessage(accessToken: string, chatId: string, text: string, mediaId?: string | null) {
+  let kind = "text";
+  let bodyText = text;
+  let resolvedMediaId = mediaId ?? null;
+  try {
+    const parsed = JSON.parse(text) as Partial<AttachmentPayload>;
+    if (parsed.kind === "attachment" && typeof parsed.previewType === "string") {
+      kind = parsed.previewType;
+      bodyText = text;
+      if (typeof parsed.mediaId === "string" && parsed.mediaId) {
+        resolvedMediaId = parsed.mediaId;
+      }
+    }
+  } catch {
+    // Plain text message.
+  }
   const response = await requestWithAuth(`/chats/${chatId}/messages`, accessToken, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cipherText: text, kind: "text" })
+    body: JSON.stringify({
+      cipherText: bodyText,
+      kind,
+      ...(resolvedMediaId ? { mediaId: resolvedMediaId } : {})
+    })
   });
   return (await response.json()) as MessageApiResponseItem;
 }
@@ -306,18 +387,23 @@ export default function App() {
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
-  const [registerAvatar, setRegisterAvatar] = useState<string | null>(null);
+  const [registerAvatarFile, setRegisterAvatarFile] = useState<File | null>(null);
+  const [registerAvatarPreview, setRegisterAvatarPreview] = useState<string | null>(null);
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [messagesByChat, setMessagesByChat] = useState<Record<string, Message[]>>({});
+  const [messagePreviewById, setMessagePreviewById] = useState<Record<string, MessagePreviewMeta>>({});
+  const [mediaBlobById, setMediaBlobById] = useState<Record<string, string>>({});
   const [discoverUsers, setDiscoverUsers] = useState<DiscoverApiResponse["users"]>([]);
   const [discoverJoinedChannels, setDiscoverJoinedChannels] = useState<DiscoverApiResponse["joinedChannels"]>([]);
   const [discoverSimilarChannels, setDiscoverSimilarChannels] = useState<DiscoverApiResponse["similarChannels"]>([]);
   const [isRealtimeReconnecting, setIsRealtimeReconnecting] = useState(false);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const wsHasOpenedRef = useRef(false);
   const [accountPassword, setAccountPassword] = useState("");
   const [session, setSession] = useState<StoredSession | null>(null);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
   const t = copy[locale];
+  const userAvatarDisplay = useResolvedAvatarUrl(userAvatar, session?.accessToken ?? null);
   const activeChatIdRef = useRef<string | null>(null);
   const localeRef = useRef(locale);
   const authUserRef = useRef(authUser);
@@ -327,12 +413,13 @@ export default function App() {
     const senderType = last?.senderId === authUser?.id ? "me" : "other";
     const peer =
       chat.kind === "dm" && authUser?.id ? chat.members.find((member) => member.id !== authUser.id) : undefined;
+    const chatName = chat.kind === "dm" ? (peer?.displayName || peer?.username || chat.title) : chat.title;
     return {
       id: chat.id,
       group: "regular",
       kind: chat.kind,
       peerUsername: peer?.username,
-      name: chat.title,
+      name: chatName,
       status: "offline",
       lastMessage: last?.cipherText ?? "",
       lastSenderType: last ? senderType : undefined,
@@ -345,15 +432,63 @@ export default function App() {
 
   const toUiMessage = (message: MessageApiResponseItem): Message => {
     const createdAt = message.sentAt;
+    let parsedAttachment: AttachmentPayload | null = null;
+    try {
+      const parsed = JSON.parse(message.cipherText) as Partial<AttachmentPayload>;
+      if (
+        parsed.kind === "attachment" &&
+        (parsed.previewType === "image" || parsed.previewType === "video" || parsed.previewType === "audio" || parsed.previewType === "file") &&
+        (typeof parsed.mediaId === "string" || typeof parsed.preview === "string")
+      ) {
+        parsedAttachment = {
+          kind: "attachment",
+          text: typeof parsed.text === "string" ? parsed.text : "",
+          mediaId: typeof parsed.mediaId === "string" ? parsed.mediaId : undefined,
+          preview: typeof parsed.preview === "string" ? parsed.preview : undefined,
+          previewType: parsed.previewType,
+          fileName: typeof parsed.fileName === "string" ? parsed.fileName : undefined
+        };
+      }
+    } catch {
+      // Plain text message.
+    }
+    if (!parsedAttachment) {
+      const inferredType = inferPreviewTypeFromDataUrl(message.cipherText);
+      if (inferredType) {
+        parsedAttachment = {
+          kind: "attachment",
+          text: "",
+          preview: message.cipherText,
+          previewType: inferredType
+        };
+      }
+    }
     return {
       id: message.id,
       sender: message.senderId === authUser?.id ? "me" : "them",
       author: message.senderId === authUser?.id ? authUser?.displayName ?? (locale === "ru" ? "Вы" : "You") : message.senderDisplayName ?? (locale === "ru" ? "Собеседник" : "Contact"),
-      text: message.cipherText,
+      text: parsedAttachment?.text ?? message.cipherText,
       time: new Date(createdAt).toLocaleTimeString(locale === "ru" ? "ru-RU" : "en-US", { hour: "2-digit", minute: "2-digit" }),
-      createdAt
+      createdAt,
+      mediaId: parsedAttachment?.mediaId,
+      preview: parsedAttachment?.preview,
+      previewType: parsedAttachment?.previewType,
+      fileName: parsedAttachment?.fileName
     };
   };
+
+  const messagesByChatWithMedia = useMemo(() => {
+    const next: Record<string, Message[]> = {};
+    for (const [chatId, rows] of Object.entries(messagesByChat)) {
+      next[chatId] = rows.map((message) => {
+        if (message.mediaId && !message.preview && mediaBlobById[message.mediaId]) {
+          return { ...message, preview: mediaBlobById[message.mediaId] };
+        }
+        return message;
+      });
+    }
+    return next;
+  }, [messagesByChat, mediaBlobById]);
 
   const trimmedDisplayName = displayName.trim();
   const trimmedUsername = username.trim();
@@ -390,6 +525,10 @@ export default function App() {
     }
     return undefined;
   }, [authMode, trimmedConfirmPassword, trimmedPassword, submitAttempted, showConfirmPasswordMismatch, t]);
+
+  useEffect(() => {
+    preloadLocaleFlags();
+  }, []);
 
   useEffect(() => {
     activeChatIdRef.current = activeChatId;
@@ -495,6 +634,87 @@ export default function App() {
   }, [activeChatId]);
 
   useEffect(() => {
+    if (!authUser || !session) return;
+    let stopped = false;
+    const intervalId = setInterval(() => {
+      if (stopped) return;
+      void runAuthorized(requestChats)
+        .then((chatRows) => {
+          if (stopped) return;
+          const nextChats = chatRows.map(toChatItem);
+          setChats(nextChats);
+          setActiveChatId((prev) => prev ?? nextChats[0]?.id ?? null);
+        })
+        .catch(() => undefined);
+
+      const currentChatId = activeChatIdRef.current;
+      if (!currentChatId) return;
+      void runAuthorized((accessToken) => requestMessages(accessToken, currentChatId))
+        .then((rows) => {
+          if (stopped) return;
+          setMessagesByChat((prev) => {
+            const merged = rows.map((row) => {
+              const ui = toUiMessage(row);
+              const meta = messagePreviewById[ui.id];
+              const blob = ui.mediaId ? mediaBlobById[ui.mediaId] : undefined;
+              const withMedia = blob && !ui.preview ? { ...ui, preview: blob } : ui;
+              return meta ? { ...withMedia, ...meta } : withMedia;
+            });
+            return { ...prev, [currentChatId]: merged };
+          });
+        })
+        .catch(() => undefined);
+    }, 1500);
+
+    return () => {
+      stopped = true;
+      clearInterval(intervalId);
+    };
+  }, [authUser, session, locale, messagePreviewById, mediaBlobById]);
+
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    const pendingIds = new Set<string>();
+    for (const rows of Object.values(messagesByChat)) {
+      for (const message of rows) {
+        if (message.mediaId && !message.preview && !mediaBlobById[message.mediaId]) {
+          pendingIds.add(message.mediaId);
+        }
+      }
+    }
+    if (pendingIds.size === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      for (const mediaId of pendingIds) {
+        if (cancelled) return;
+        try {
+          const blobUrl = await fetchMediaBlobUrl(session.accessToken, mediaId);
+          if (cancelled) {
+            URL.revokeObjectURL(blobUrl);
+            return;
+          }
+          setMediaBlobById((prev) => (prev[mediaId] ? prev : { ...prev, [mediaId]: blobUrl }));
+        } catch {
+          // Preview stays unavailable until the next poll cycle.
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messagesByChat, session?.accessToken, mediaBlobById]);
+
+  useEffect(() => {
+    return () => {
+      for (const url of Object.values(mediaBlobById)) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!authUser?.id || !session?.accessToken) {
       setDiscoverUsers([]);
       setDiscoverJoinedChannels([]);
@@ -528,6 +748,7 @@ export default function App() {
     if (!authUser?.id || !session?.accessToken) {
       wsHasOpenedRef.current = false;
       setIsRealtimeReconnecting(false);
+      setIsRealtimeConnected(false);
       return;
     }
     const endpoints = wsCandidates(session.accessToken);
@@ -543,6 +764,7 @@ export default function App() {
       nextSocket.onopen = () => {
         wsHasOpenedRef.current = true;
         setIsRealtimeReconnecting(false);
+        setIsRealtimeConnected(true);
       };
 
       nextSocket.onmessage = (event) => {
@@ -591,6 +813,7 @@ export default function App() {
       nextSocket.onclose = () => {
         if (!closed && wsHasOpenedRef.current) {
           setIsRealtimeReconnecting(true);
+          setIsRealtimeConnected(false);
         }
         if (!closed) connect(index + 1);
       };
@@ -601,6 +824,7 @@ export default function App() {
       closed = true;
       wsHasOpenedRef.current = false;
       setIsRealtimeReconnecting(false);
+      setIsRealtimeConnected(false);
       socket?.close();
     };
   }, [authUser?.id, session?.accessToken]);
@@ -635,16 +859,42 @@ export default function App() {
     setAuthError("");
     setIsSubmittingAuth(true);
     try {
-      const user = await requestAuth(authMode, { displayName, username, password }, locale);
-      const authUserData: AuthUser = { id: user.id, displayName: user.displayName, username: user.username, avatarUrl: user.avatarUrl ?? null };
+      const authPayload: { displayName: string; username: string; password: string; avatarUrl?: string | null } = {
+        displayName,
+        username,
+        password
+      };
+      const user = await requestAuth(authMode, authPayload, locale);
+      let avatarUrl = user.avatarUrl ?? null;
+      if (authMode === "register" && registerAvatarFile) {
+        try {
+          const updated = await requestUpdateProfile(
+            user.accessToken,
+            {
+              displayName: user.displayName,
+              username: user.username,
+              oldPassword: "",
+              newPassword: "",
+              avatarUrl: await uploadAvatarMediaRef(user.accessToken, registerAvatarFile)
+            },
+            locale
+          );
+          avatarUrl = updated.avatarUrl ?? null;
+        } catch {
+          // Account is created; avatar can be set later in profile.
+        }
+      }
+      const authUserData: AuthUser = { id: user.id, displayName: user.displayName, username: user.username, avatarUrl };
       const nextSession: StoredSession = { user: authUserData, accessToken: user.accessToken, refreshToken: user.refreshToken };
       setAuthUser(authUserData);
       setSession(nextSession);
       saveStoredSession(nextSession);
       setAccountPassword(trimmedPassword);
       setAuthMode("login");
-      setUserAvatar(user.avatarUrl ?? registerAvatar ?? null);
-      setRegisterAvatar(null);
+      setUserAvatar(avatarUrl);
+      if (registerAvatarPreview) URL.revokeObjectURL(registerAvatarPreview);
+      setRegisterAvatarFile(null);
+      setRegisterAvatarPreview(null);
       setActiveChatId(null);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
@@ -688,6 +938,9 @@ export default function App() {
           setUsername("");
           setPassword("");
           setConfirmPassword("");
+          if (registerAvatarPreview) URL.revokeObjectURL(registerAvatarPreview);
+          setRegisterAvatarFile(null);
+          setRegisterAvatarPreview(null);
           resetValidationState();
         }}
         onDisplayNameChange={(value) => {
@@ -751,16 +1004,18 @@ export default function App() {
           setFieldEditedInFocus((prev) => ({ ...prev, confirmPassword: false }));
         }}
         onSubmit={handleAuthSubmit}
-        registerAvatar={registerAvatar}
+        registerAvatarPreview={registerAvatarPreview}
         onRegisterAvatarUpload={(file) => {
           if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (typeof reader.result === "string") setRegisterAvatar(reader.result);
-          };
-          reader.readAsDataURL(file);
+          if (registerAvatarPreview) URL.revokeObjectURL(registerAvatarPreview);
+          setRegisterAvatarFile(file);
+          setRegisterAvatarPreview(URL.createObjectURL(file));
         }}
-        onRegisterAvatarReset={() => setRegisterAvatar(null)}
+        onRegisterAvatarReset={() => {
+          if (registerAvatarPreview) URL.revokeObjectURL(registerAvatarPreview);
+          setRegisterAvatarFile(null);
+          setRegisterAvatarPreview(null);
+        }}
       />
     );
   }
@@ -770,16 +1025,18 @@ export default function App() {
       locale={locale}
       theme={theme}
       authUser={authUser}
-      userAvatar={userAvatar}
+      userAvatar={userAvatarDisplay}
+      userAvatarRef={userAvatar}
       isMenuOpen={isMenuOpen}
       isRealtimeReconnecting={isRealtimeReconnecting}
+      isRealtimeConnected={isRealtimeConnected}
       search={search}
       discoverUsers={discoverUsers}
       discoverJoinedChannels={discoverJoinedChannels}
       discoverSimilarChannels={discoverSimilarChannels}
       activeChatId={activeChatId}
       chats={chats}
-      messages={activeChatId ? messagesByChat[activeChatId] ?? [] : []}
+      messages={activeChatId ? messagesByChatWithMedia[activeChatId] ?? [] : []}
       input={input}
       onToggleMenu={() => setIsMenuOpen((prev) => !prev)}
       onCloseMenu={() => setIsMenuOpen(false)}
@@ -798,29 +1055,108 @@ export default function App() {
           const created = await runAuthorized((accessToken) =>
             requestCreateChat(accessToken, { title: user.displayName || user.username, members: [user.id] })
           );
-          const nextRows = await runAuthorized(requestChats);
-          const nextChats = nextRows.map(toChatItem);
-          setChats(nextChats);
           setActiveChatId(created.id);
-          loadMessagesForChat(created.id);
+          void loadMessagesForChat(created.id);
+          void runAuthorized(requestChats)
+            .then((nextRows) => {
+              const nextChats = nextRows.map(toChatItem);
+              setChats(nextChats);
+            })
+            .catch(() => {
+              // Keep currently opened chat usable even if chat list refresh fails.
+            });
         } catch {
-          // Keep UI stable if DM creation fails.
+          throw new Error(locale === "ru" ? "не удалось создать/открыть чат" : "failed to create/open chat");
         }
       }}
       onSearchChange={setSearch}
       onInputChange={setInput}
+      onPrepareAttachment={async (file) => {
+        const type: PendingAttachment["type"] = file.type.startsWith("video/")
+          ? "video"
+          : file.type.startsWith("audio/")
+            ? "audio"
+            : file.type.startsWith("image/")
+              ? "image"
+              : "file";
+        const localPreview = URL.createObjectURL(file);
+        const uploaded = await runAuthorized((accessToken) => uploadMediaFile(accessToken, file));
+        return {
+          mediaId: uploaded.mediaId,
+          type,
+          name: uploaded.name,
+          localPreview
+        };
+      }}
       onSendMessage={(attachment) => {
         if (!activeChatId || (!input.trim() && !attachment)) return;
-        const messageText = input.trim() || attachment?.name || (locale === "ru" ? "Вложение" : "Attachment");
+        const plainText = input.trim();
+        const messageText = plainText || attachment?.name || (locale === "ru" ? "Вложение" : "Attachment");
+        const wireText = attachment
+          ? JSON.stringify({
+              kind: "attachment",
+              text: plainText,
+              mediaId: attachment.mediaId,
+              previewType: attachment.type,
+              fileName: attachment.name
+            } satisfies AttachmentPayload)
+          : messageText;
+        const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const optimisticMessage: Message = {
+          id: optimisticId,
+          sender: "me",
+          author: authUser.displayName,
+          text: messageText,
+          time: new Date().toLocaleTimeString(locale === "ru" ? "ru-RU" : "en-US", { hour: "2-digit", minute: "2-digit" }),
+          createdAt: new Date().toISOString(),
+          mediaId: attachment?.mediaId,
+          preview: attachment?.localPreview,
+          previewType: attachment?.type,
+          fileName: attachment?.name
+        };
+        const attachmentPreviewUrl = attachment?.localPreview;
         setInput("");
-        void runAuthorized((accessToken) => requestSendMessage(accessToken, activeChatId, messageText))
+        setMessagesByChat((prev) => ({
+          ...prev,
+          [activeChatId]: [...(prev[activeChatId] ?? []), optimisticMessage]
+        }));
+        if (attachment) {
+          URL.revokeObjectURL(attachment.localPreview);
+        }
+        void runAuthorized((accessToken) => requestSendMessage(accessToken, activeChatId, wireText, attachment?.mediaId ?? null))
           .then((created) => {
             const uiMessage = toUiMessage(created);
+            if (attachment && attachmentPreviewUrl) {
+              setMessagePreviewById((prev) => ({
+                ...prev,
+                [uiMessage.id]: {
+                  preview: attachmentPreviewUrl,
+                  previewType: attachment.type,
+                  fileName: attachment.name
+                }
+              }));
+              setMediaBlobById((prev) =>
+                prev[attachment.mediaId] ? prev : { ...prev, [attachment.mediaId]: attachmentPreviewUrl }
+              );
+            }
             setMessagesByChat((prev) => ({
               ...prev,
-              [activeChatId]: (prev[activeChatId] ?? []).some((item) => item.id === uiMessage.id)
-                ? prev[activeChatId] ?? []
-                : [...(prev[activeChatId] ?? []), uiMessage]
+              [activeChatId]: (prev[activeChatId] ?? [])
+                .filter((item) => item.id !== optimisticId)
+                .some((item) => item.id === uiMessage.id)
+                ? (prev[activeChatId] ?? []).filter((item) => item.id !== optimisticId)
+                : [
+                    ...(prev[activeChatId] ?? []).filter((item) => item.id !== optimisticId),
+                    attachment
+                      ? {
+                          ...uiMessage,
+                          mediaId: attachment.mediaId,
+                          preview: attachmentPreviewUrl,
+                          previewType: attachment.type,
+                          fileName: attachment.name
+                        }
+                      : uiMessage
+                  ]
             }));
             setChats((prev) =>
               prev.map((chat) =>
@@ -837,7 +1173,12 @@ export default function App() {
               )
             );
           })
-          .catch(() => undefined);
+          .catch(() => {
+            setMessagesByChat((prev) => ({
+              ...prev,
+              [activeChatId]: (prev[activeChatId] ?? []).filter((item) => item.id !== optimisticId)
+            }));
+          });
       }}
       onLogout={() => {
         setAuthUser(null);
@@ -900,32 +1241,27 @@ export default function App() {
       }}
       onUploadAvatar={async (file) => {
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async () => {
-          if (typeof reader.result !== "string") return;
-          try {
-            const updated = await runAuthorized((accessToken) =>
-              requestUpdateProfile(accessToken, {
-                displayName: authUser.displayName,
-                username: authUser.username,
-                oldPassword: "",
-                newPassword: "",
-                avatarUrl: reader.result
-              }, locale)
-            );
-            setAuthUser(updated);
-            setSession((prev) => {
-              if (!prev) return prev;
-              const next = { ...prev, user: updated };
-              saveStoredSession(next);
-              return next;
-            });
-            setUserAvatar(updated.avatarUrl ?? null);
-          } catch {
-            // Keep current avatar on upload errors.
-          }
-        };
-        reader.readAsDataURL(file);
+        try {
+          const updated = await runAuthorized(async (accessToken) =>
+            requestUpdateProfile(accessToken, {
+              displayName: authUser.displayName,
+              username: authUser.username,
+              oldPassword: "",
+              newPassword: "",
+              avatarUrl: await uploadAvatarMediaRef(accessToken, file)
+            }, locale)
+          );
+          setAuthUser(updated);
+          setSession((prev) => {
+            if (!prev) return prev;
+            const next = { ...prev, user: updated };
+            saveStoredSession(next);
+            return next;
+          });
+          setUserAvatar(updated.avatarUrl ?? null);
+        } catch {
+          // Keep current avatar on upload errors.
+        }
       }}
       onResetAvatar={() => {
         void runAuthorized((accessToken) =>
