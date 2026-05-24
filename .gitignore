@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Local environment (examples stay tracked)
+.env
+.env.local
+.env.*.local
+
+# Logs and caches
+*.log
+.npm
+.pnpm-store
+.turbo
+coverage/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Prisma local DB (if used)
+*.db
+*.db-journal
+
+# Local dev data (e.g. media fallback storage)
+.data/

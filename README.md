@@ -30,6 +30,18 @@ Repository: [github.com/sun-demon/message2](https://github.com/sun-demon/message
 - `infra/docker` - local/prod container orchestration
 - `infra/observability` - Prometheus/Grafana setup
 - `docs` - product, security, operations, test plans
+- `docs/ai-context.md` - living implementation status and priorities (for contributors and AI assistants)
+- `AGENTS.md` - concise agent onboarding (commands, service map, do-not-commit rules)
+
+## AI-assisted development
+
+When using Cursor or other AI tools on this repo:
+
+1. Read [docs/ai-context.md](docs/ai-context.md) for current stack, scripts, and active tasks.
+2. Follow the immutable coursework topic in [.cursor/rules/coursework-context.mdc](.cursor/rules/coursework-context.mdc).
+3. Use [AGENTS.md](AGENTS.md) for commands and local service ports.
+
+After meaningful changes, update sections 2–5 in `docs/ai-context.md` (not section 1).
 
 ## Quick Start
 
@@ -115,6 +127,10 @@ The same codebase supports two operation modes:
 - **Corporate mode**: internal DNS, private ingress/VPN, tighter policy defaults (private origins only, stricter firewalling, optional SIEM forwarding from audit events).
 
 Detailed runbook and recommended controls: `docs/ops/deployment-profiles.md`.
+
+## Git workflow
+
+Daily work merges into **`develop`**; **`main`** receives tested releases (tags). See [docs/ops/git-branching.md](docs/ops/git-branching.md).
 
 ## Project Feedback And Contact
 
