@@ -144,10 +144,16 @@ const normalizeOptionalField = (value: unknown) => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
+const AVATAR_MEDIA_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const normalizeAvatarUrl = (value: unknown) => {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
+  if (trimmed.startsWith("media:")) {
+    const mediaId = trimmed.slice("media:".length);
+    return AVATAR_MEDIA_ID_RE.test(mediaId) ? trimmed : null;
+  }
   if (trimmed.length > 1_000_000) return null;
   if (trimmed.startsWith("data:image/")) return trimmed;
   if (/^https?:\/\//.test(trimmed)) return trimmed;
@@ -358,6 +364,13 @@ app.post("/auth/register", async (req, res) => {
     return;
   }
 
+  const hasAvatarField = Object.prototype.hasOwnProperty.call(req.body, "avatarUrl");
+  const avatarUrl = hasAvatarField ? normalizeAvatarUrl(req.body.avatarUrl) : null;
+  if (hasAvatarField && req.body.avatarUrl != null && String(req.body.avatarUrl).trim() !== "" && !avatarUrl) {
+    res.status(400).json({ error: "invalid avatar" });
+    return;
+  }
+
   try {
     const existingUser = await prisma.user.findUnique({ where: { username } });
     if (existingUser) {
@@ -371,7 +384,8 @@ app.post("/auth/register", async (req, res) => {
         displayName,
         username,
         passwordHash: await hashPassword(password),
-        role: userCount === 0 && req.body.bootstrapAdmin === true ? "admin" : "user"
+        role: userCount === 0 && req.body.bootstrapAdmin === true ? "admin" : "user",
+        ...(hasAvatarField ? { avatarUrl } : {})
       }
     });
 
@@ -758,6 +772,36 @@ app.post("/chats", auth, async (req: AuthRequest, res) => {
       ? req.body.members.filter((member: unknown): member is string => typeof member === "string")
       : [];
     const members = Array.from(new Set([authorId, ...requestedMembers]));
+    const isDirectChatRequest = requestedMembers.length === 1 && members.length === 2;
+
+    if (isDirectChatRequest) {
+      const peerId = requestedMembers[0];
+      const existing = await prisma.chat.findMany({
+        where: {
+          members: {
+            some: { userId: authorId }
+          }
+        },
+        include: {
+          members: true
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50
+      });
+      const existingDirectChat = existing.find((chat) => {
+        if (chat.members.length !== 2) return false;
+        const ids = chat.members.map((member) => member.userId);
+        return ids.includes(authorId) && ids.includes(peerId);
+      });
+      if (existingDirectChat) {
+        res.status(200).json({
+          id: existingDirectChat.id,
+          title: existingDirectChat.title,
+          members: existingDirectChat.members.map((member) => member.userId)
+        });
+        return;
+      }
+    }
 
     const chat = await prisma.chat.create({
       data: {
@@ -774,7 +818,8 @@ app.post("/chats", auth, async (req: AuthRequest, res) => {
       title: chat.title,
       members: chat.members.map((member) => member.userId)
     });
-  } catch {
+  } catch (error) {
+    console.error("[chats/create]", error);
     res.status(500).json({ error: "failed to create chat" });
   }
 });
@@ -1010,6 +1055,23 @@ app.post("/chats/:chatId/messages", auth, async (req: AuthRequest, res) => {
     }
   }
   res.status(201).json(envelope);
+});
+
+app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const maybeErr = err as { type?: string; status?: number; message?: string } | undefined;
+  const isClientAbort = req.aborted || maybeErr?.type === "request.aborted";
+  if (isClientAbort) {
+    // Browser/HMR can drop in-flight requests; treat as a benign client disconnect.
+    if (!res.headersSent) {
+      res.status(499).end();
+    }
+    return;
+  }
+  if (!res.headersSent) {
+    res.status(maybeErr?.status ?? 500).json({ error: maybeErr?.message ?? "internal server error" });
+    return;
+  }
+  next(err);
 });
 
 const port = Number(process.env.PORT ?? 4001);

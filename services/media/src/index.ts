@@ -4,18 +4,28 @@ import multer from "multer";
 import { randomUUID } from "node:crypto";
 import helmet from "helmet";
 import jwt from "jsonwebtoken";
+import { getMediaMeta, getMediaStream, getStorageLabel, initMediaStorage, putMediaObject } from "./storage.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(helmet());
 
-app.get("/health", (_req, res) => res.json({ ok: true, service: "media" }));
-
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
-const media = new Map<string, { id: string; name: string; mime: string; size: number; previewReady: boolean }>();
 const jwtSecret = process.env.JWT_SECRET ?? "change-me-in-production";
-const allowedMimeTypes = new Set(["image/jpeg", "image/png", "video/mp4", "audio/mpeg", "application/pdf"]);
+const allowedMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "video/mp4",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/webm",
+  "application/pdf"
+]);
+
+let storageReady = false;
 
 const auth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const header = req.header("authorization") ?? "";
@@ -32,7 +42,23 @@ const auth = (req: express.Request, res: express.Response, next: express.NextFun
   }
 };
 
-app.post("/media/upload", auth, upload.single("file"), (req, res) => {
+app.get("/health", (_req, res) => {
+  res.json({ ok: true, service: "media", storageReady, storage: storageReady ? getStorageLabel() : null });
+});
+
+app.get("/health/ready", (_req, res) => {
+  if (!storageReady) {
+    res.status(503).json({ ok: false, service: "media", error: "object storage unavailable" });
+    return;
+  }
+  res.json({ ok: true, service: "media" });
+});
+
+app.post("/upload", auth, upload.single("file"), async (req, res) => {
+  if (!storageReady) {
+    res.status(503).json({ error: "object storage unavailable" });
+    return;
+  }
   if (!req.file) {
     res.status(400).json({ error: "File is required" });
     return;
@@ -41,36 +67,78 @@ app.post("/media/upload", auth, upload.single("file"), (req, res) => {
     res.status(415).json({ error: "unsupported media type" });
     return;
   }
-  const id = randomUUID();
-  media.set(id, {
-    id,
-    name: req.file.originalname,
-    mime: req.file.mimetype,
-    size: req.file.size,
-    previewReady: false
+
+  const mediaId = randomUUID();
+  try {
+    const meta = await putMediaObject(mediaId, req.file.buffer, req.file.mimetype, req.file.originalname);
+    res.status(201).json({
+      mediaId: meta.id,
+      name: meta.name,
+      mime: meta.mime,
+      size: meta.size,
+      contentUrl: `/objects/${meta.id}/content`
+    });
+  } catch (error) {
+    console.error("[media/upload]", error);
+    res.status(500).json({ error: "failed to store media" });
+  }
+});
+
+app.get("/objects/:mediaId", auth, async (req, res) => {
+  if (!storageReady) {
+    res.status(503).json({ error: "object storage unavailable" });
+    return;
+  }
+  const meta = await getMediaMeta(req.params.mediaId);
+  if (!meta) {
+    res.status(404).json({ error: "media not found" });
+    return;
+  }
+  res.json({
+    mediaId: meta.id,
+    name: meta.name,
+    mime: meta.mime,
+    size: meta.size,
+    contentUrl: `/objects/${meta.id}/content`
   });
-  res.status(201).json({ mediaId: id });
 });
 
-app.post("/media/:mediaId/preview", auth, (req, res) => {
-  const item = media.get(req.params.mediaId);
-  if (!item) {
+app.get("/objects/:mediaId/content", auth, async (req, res) => {
+  if (!storageReady) {
+    res.status(503).json({ error: "object storage unavailable" });
+    return;
+  }
+  const payload = await getMediaStream(req.params.mediaId);
+  if (!payload) {
     res.status(404).json({ error: "media not found" });
     return;
   }
-  item.previewReady = true;
-  media.set(item.id, item);
-  res.json({ mediaId: item.id, previewUrl: `/media/${item.id}/preview.jpg`, kind: item.mime });
-});
-
-app.get("/media/:mediaId", auth, (req, res) => {
-  const item = media.get(req.params.mediaId);
-  if (!item) {
-    res.status(404).json({ error: "media not found" });
-    return;
+  res.setHeader("Content-Type", payload.mime);
+  if (payload.size > 0) {
+    res.setHeader("Content-Length", String(payload.size));
   }
-  res.json(item);
+  res.setHeader("Cache-Control", "private, max-age=3600");
+  payload.stream.on("error", () => {
+    if (!res.headersSent) {
+      res.status(500).end();
+    }
+  });
+  payload.stream.pipe(res);
 });
 
 const port = Number(process.env.PORT ?? 4002);
-app.listen(port, () => console.log(`media listening on :${port}`));
+
+async function bootstrap() {
+  try {
+    await initMediaStorage();
+    storageReady = true;
+    console.log(`[media] storage ready (${getStorageLabel()})`);
+  } catch (error) {
+    storageReady = false;
+    console.error("[media] storage init failed — uploads disabled", error);
+  }
+
+  app.listen(port, () => console.log(`media listening on :${port}`));
+}
+
+void bootstrap();

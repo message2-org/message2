@@ -16,7 +16,6 @@ app.use(cors({
     cb(new Error("CORS policy denied this origin"));
   }
 }));
-app.use(express.json());
 app.use(helmet());
 app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
 app.set("trust proxy", 1);
