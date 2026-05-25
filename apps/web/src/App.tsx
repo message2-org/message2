@@ -5,7 +5,7 @@ import { ChatPage } from "./pages/ChatPage";
 import { uploadAvatarMediaRef } from "./lib/avatar";
 import { fetchMediaBlobUrl, uploadMediaFile } from "./lib/media";
 import { useResolvedAvatarUrl } from "./hooks/useResolvedAvatarUrl";
-import { AuthMode, AuthUser, ChatItem, Message, PendingAttachment } from "./types";
+import { AuthMode, AuthUser, ChatItem, Message, PendingAttachment, TransparencyBanner } from "./types";
 
 const API_BASE_URLS = ["/messaging", "http://localhost:4000/messaging", "http://localhost:4001"] as const;
 const USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -36,6 +36,9 @@ type MessageApiResponseItem = {
   cipherText: string;
   sentAt: string;
   senderDisplayName?: string;
+  disclosure?: Message["disclosure"];
+  isTombstone?: boolean;
+  tombstoneLabel?: string;
 };
 type AttachmentPayload = {
   kind: "attachment";
@@ -398,6 +401,7 @@ export default function App() {
   const [discoverSimilarChannels, setDiscoverSimilarChannels] = useState<DiscoverApiResponse["similarChannels"]>([]);
   const [isRealtimeReconnecting, setIsRealtimeReconnecting] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [transparencyBanner, setTransparencyBanner] = useState<TransparencyBanner | null>(null);
   const wsHasOpenedRef = useRef(false);
   const [accountPassword, setAccountPassword] = useState("");
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -463,6 +467,20 @@ export default function App() {
         };
       }
     }
+    if (message.isTombstone) {
+      return {
+        id: message.id,
+        sender: "them",
+        author: locale === "ru" ? "Система" : "System",
+        text: message.tombstoneLabel ?? (locale === "ru" ? "Сообщение удалено." : "Message removed."),
+        time: new Date(createdAt).toLocaleTimeString(locale === "ru" ? "ru-RU" : "en-US", { hour: "2-digit", minute: "2-digit" }),
+        createdAt,
+        isTombstone: true,
+        tombstoneLabel: message.tombstoneLabel,
+        disclosure: message.disclosure
+      };
+    }
+
     return {
       id: message.id,
       sender: message.senderId === authUser?.id ? "me" : "them",
@@ -473,7 +491,8 @@ export default function App() {
       mediaId: parsedAttachment?.mediaId,
       preview: parsedAttachment?.preview,
       previewType: parsedAttachment?.previewType,
-      fileName: parsedAttachment?.fileName
+      fileName: parsedAttachment?.fileName,
+      disclosure: message.disclosure
     };
   };
 
@@ -769,8 +788,90 @@ export default function App() {
 
       nextSocket.onmessage = (event) => {
         try {
-          const parsed = JSON.parse(String(event.data)) as { type?: string; payload?: MessageApiResponseItem };
-          if (parsed.type !== "message.created" || !parsed.payload) return;
+          const parsed = JSON.parse(String(event.data)) as {
+            type?: string;
+            payload?: MessageApiResponseItem & {
+              chatId?: string;
+              messageId?: string;
+              summary?: string;
+              eventId?: string;
+              action?: string;
+              createdAt?: string;
+              disclosureLevel?: string;
+              label?: string;
+              deletedAt?: string;
+            };
+          };
+          if (!parsed.type || !parsed.payload) return;
+
+          if (parsed.type === "transparency.notice") {
+            const payload = parsed.payload;
+            if (!payload.eventId || !payload.summary) return;
+            setTransparencyBanner({
+              eventId: payload.eventId,
+              summary: payload.summary,
+              action: payload.action ?? "message_read",
+              createdAt: payload.createdAt ?? new Date().toISOString()
+            });
+            return;
+          }
+
+          if (parsed.type === "message.disclosure") {
+            const payload = parsed.payload;
+            if (!payload.chatId || !payload.messageId) return;
+            const level =
+              payload.disclosureLevel === "full" || payload.disclosureLevel === "sealed"
+                ? payload.disclosureLevel
+                : "partial";
+            setMessagesByChat((prev) => {
+              const rows = prev[payload.chatId!] ?? [];
+              const next = rows.map((row) =>
+                row.id === payload.messageId
+                  ? {
+                      ...row,
+                      disclosure: {
+                        eventId: payload.eventId ?? "",
+                        action: payload.action ?? "message_read",
+                        disclosureLevel: level
+                      }
+                    }
+                  : row
+              );
+              return { ...prev, [payload.chatId!]: next };
+            });
+            return;
+          }
+
+          if (parsed.type === "message.tombstone") {
+            const payload = parsed.payload;
+            if (!payload.chatId || !payload.messageId) return;
+            const tombUi: Message = {
+              id: payload.messageId,
+              sender: "them",
+              author: localeRef.current === "ru" ? "Система" : "System",
+              text: payload.label ?? (localeRef.current === "ru" ? "Сообщение удалено." : "Message removed."),
+              time: new Date(payload.deletedAt ?? Date.now()).toLocaleTimeString(
+                localeRef.current === "ru" ? "ru-RU" : "en-US",
+                { hour: "2-digit", minute: "2-digit" }
+              ),
+              createdAt: payload.deletedAt,
+              isTombstone: true,
+              tombstoneLabel: payload.label,
+              disclosure: {
+                eventId: payload.eventId ?? "",
+                action: "message_delete",
+                disclosureLevel: "partial"
+              }
+            };
+            setMessagesByChat((prev) => {
+              const rows = prev[payload.chatId!] ?? [];
+              const without = rows.filter((row) => row.id !== payload.messageId);
+              return { ...prev, [payload.chatId!]: [...without, tombUi] };
+            });
+            return;
+          }
+
+          if (parsed.type !== "message.created") return;
           const payload = parsed.payload;
           const uiMessage = toUiMessage(payload);
           const currentLocale = localeRef.current;
@@ -1030,6 +1131,8 @@ export default function App() {
       isMenuOpen={isMenuOpen}
       isRealtimeReconnecting={isRealtimeReconnecting}
       isRealtimeConnected={isRealtimeConnected}
+      transparencyBanner={transparencyBanner}
+      onDismissTransparency={() => setTransparencyBanner(null)}
       search={search}
       discoverUsers={discoverUsers}
       discoverJoinedChannels={discoverJoinedChannels}

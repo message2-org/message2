@@ -25,6 +25,12 @@ export type ChatItem = {
   unread: number;
 };
 
+export type MessageDisclosure = {
+  eventId: string;
+  action: string;
+  disclosureLevel: "full" | "partial" | "sealed";
+};
+
 export type Message = {
   id: string;
   sender: "me" | "them";
@@ -36,6 +42,16 @@ export type Message = {
   preview?: string;
   previewType?: "image" | "video" | "audio" | "file";
   fileName?: string;
+  disclosure?: MessageDisclosure;
+  isTombstone?: boolean;
+  tombstoneLabel?: string;
+};
+
+export type TransparencyBanner = {
+  eventId: string;
+  summary: string;
+  action: string;
+  createdAt: string;
 };
 
 export type PendingAttachment = {

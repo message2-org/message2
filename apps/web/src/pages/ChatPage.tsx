@@ -3,7 +3,7 @@ import EmojiPicker, { type EmojiClickData } from "emoji-picker-react";
 import { buildAvatarGradient, buildUserInitials } from "../lib/avatar";
 import { copy, localeOptions, Locale } from "../i18n";
 import { chatMatchesSearch } from "../search-utils";
-import { AuthUser, ChatItem, Message, PendingAttachment } from "../types";
+import { AuthUser, ChatItem, Message, PendingAttachment, TransparencyBanner } from "../types";
 import { SidebarDiscovery, type DiscoveryTabId } from "../components/SidebarDiscovery";
 import {
   ArchiveIcon,
@@ -54,6 +54,8 @@ type ChatPageProps = {
   /** True only after the realtime channel was open and then dropped (not during initial connect). */
   isRealtimeReconnecting: boolean;
   isRealtimeConnected: boolean;
+  transparencyBanner: TransparencyBanner | null;
+  onDismissTransparency: () => void;
   search: string;
   discoverUsers: { id: string; username: string; displayName: string }[];
   discoverJoinedChannels: { id: string; name: string; subscribers: number }[];
@@ -95,6 +97,8 @@ export function ChatPage(props: ChatPageProps) {
     isMenuOpen,
     isRealtimeReconnecting,
     isRealtimeConnected,
+    transparencyBanner,
+    onDismissTransparency,
     search,
     discoverUsers,
     discoverJoinedChannels,
@@ -1225,6 +1229,18 @@ export function ChatPage(props: ChatPageProps) {
           </header>
         ) : null}
 
+        {transparencyBanner ? (
+          <div className="transparency-banner" role="status">
+            <span className="transparency-banner__icon" title={locale === "ru" ? "Служебный доступ" : "Privileged access"} aria-hidden="true">
+              🕶️
+            </span>
+            <p className="transparency-banner__text">{transparencyBanner.summary}</p>
+            <button type="button" className="transparency-banner__close" onClick={onDismissTransparency} aria-label={locale === "ru" ? "Закрыть" : "Dismiss"}>
+              ×
+            </button>
+          </div>
+        ) : null}
+
         <div className="messages">
           {activeChat ? (
             <>
@@ -1235,6 +1251,19 @@ export function ChatPage(props: ChatPageProps) {
                 const isLastInSeries = !next || next.sender !== message.sender;
                 const dayLabel = messageDateLabel(message, prev);
                 const isEmojiOnly = isEmojiOnlyText(message.text) && !message.preview;
+                const disclosureBadge = message.disclosure ? (
+                  <span
+                    className="message__disclosure-badge"
+                    title={
+                      locale === "ru"
+                        ? `Служебный доступ (${message.disclosure.action})`
+                        : `Privileged access (${message.disclosure.action})`
+                    }
+                    aria-label={locale === "ru" ? "Проверено третьей стороной" : "Reviewed by third party"}
+                  >
+                    🕶️
+                  </span>
+                ) : null;
                 const mediaNode = message.preview ? (
                   message.previewType === "video" ? (
                     <video src={message.preview} className="message__preview" controls />
@@ -1252,9 +1281,12 @@ export function ChatPage(props: ChatPageProps) {
                   <div key={message.id}>
                     {dayLabel ? <div className="message-day-sep">{dayLabel}</div> : null}
                     {message.sender === "me" ? (
-                      <article className="message message--me">
+                      <article className={`message message--me ${message.isTombstone ? "message--tombstone" : ""}`}>
                         {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
-                        <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>
+                        <div className="message__body-row">
+                          <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>
+                          {disclosureBadge}
+                        </div>
                         {mediaNode}
                         <p className="message__time">{message.time}</p>
                       </article>
@@ -1263,9 +1295,12 @@ export function ChatPage(props: ChatPageProps) {
                         <div className="message-row__avatar-slot">
                           {isLastInSeries ? <span className="message-row__avatar">{senderInitial(message.author)}</span> : null}
                         </div>
-                        <article className="message">
+                        <article className={`message ${message.isTombstone ? "message--tombstone" : ""}`}>
                           {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
-                          <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>
+                          <div className="message__body-row">
+                            <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>
+                            {disclosureBadge}
+                          </div>
                           {mediaNode}
                           <p className="message__time">{message.time}</p>
                         </article>
