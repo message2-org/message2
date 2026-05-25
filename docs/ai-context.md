@@ -34,14 +34,19 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Security-first defaults across services.
 - Preserve compatibility with self-hosted Debian deployment.
 - Media storage: blobs in object storage (MinIO/S3 or dev filesystem); DB holds `mediaId` on messages and `media:<uuid>` on `User.avatarUrl`. Message `cipherText` stays encrypted payload (client E2E when enabled).
+- Public profile lawful access: mandatory reason/`legalRef`, transparency + tombstones, user complaints — spec in `docs/security/lawful-access-transparency.md`. Corporate: external lawful API off; encryption **admin-configurable** (not forced max).
+- **Implementation tracker (lawful access / profiles):** `docs/security/lawful-access-implementation-status.md` — update after each coding session; survives closed agent chats.
 
 ## 4) Active Priorities (Mutable)
 
 - [x] Wire `media` service to MinIO; new attachments use `mediaId` (legacy base64 in `cipherText` still readable).
 - [ ] Client-side encryption for message media blobs (E2E).
 - [ ] Refine registration UX (`displayName` optional, clear labels).
+- [x] Lawful access **P1** (contracts, validation, `POST /privileged/operations`, tests).
+- [x] Lawful access **P2** (tombstones/disclosures in messaging, WS, web badge + banner). Detail screen / complaints → P4.
 - [ ] Define deployment-profile auth policy matrix (public vs corporate).
-- [ ] Harden session/token lifecycle for production-grade behavior.
+- [ ] Harden session/token lifecycle for production-grade behavior (refresh rotation exists; tighten policy/docs).
+- [ ] Align v1 product gaps: message edit/delete/react, receipts/typing/presence, real push (see lawful-access-implementation-status § Compliance audit).
 - [ ] Continue Android client integration later.
 
 ## 5) Decision Log (Mutable)
@@ -52,8 +57,13 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - 2026-05-24: Avatars stored as `media:<uuid>` in `User.avatarUrl` (blob in MinIO/filesystem); legacy `data:image` still accepted. Registration uploads avatar after account creation.
 - 2026-05-24: Registration shows auto-avatar preview; client resizes to 256px before upload; message media no longer embedded in `cipherText` for new sends.
 - 2026-05-24: Added split dev scripts (`dev:web`, `dev:backend`, `dev:backend:core`) and DB reset helpers (`db:reset`, `db:clear`).
-- 2026-05-05: Local development can proceed with `pnpm dev` without Docker.
+- 2026-05-05: `pnpm dev:web` works without Docker; full stack needs `pnpm infra:up` (Postgres/Redis/MinIO) before `pnpm dev` or use `pnpm dev:full`.
 - 2026-05-05: `displayName` treated as optional; `email` considered policy-driven, not globally mandatory.
+- 2026-05-24: Added `docs/security/lawful-access-transparency.md` (public lawful API policy, operator requirements, transparency, complaints, implementation phases).
+- 2026-05-24: Requirements + `lawful-access-implementation-status.md` tracker for cross-chat continuity (spec is mostly 📄; code still P0–P1 stub).
+- 2026-05-24: Compliance audit — structure matches AGENTS; lawful/E2EE/v1 features mostly ⬜; fixed README Argon2 wording + docker dev note.
+- 2026-05-24: Lawful access P1 — `@message2/contracts` lawful types/validation; `access-audit` `/privileged/operations`; `lawful-reason-codes.json`; tests.
+- 2026-05-24: Lawful access P2 — messaging transparency tables, `/internal/transparency`, WS events, web 🕶️ badge + banner. Run `pnpm db:migrate:deploy` after pull.
 
 ## 6) How To Update This File
 

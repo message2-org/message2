@@ -6,6 +6,7 @@ This document maps Message2 to the coursework requirement: a secure client-serve
 
 ## Public profile (internet-facing)
 
+- Lawful-access and user transparency policy: [lawful-access-transparency.md](../security/lawful-access-transparency.md) (`DEPLOYMENT_PROFILE=public`, `LAWFUL_ACCESS_ENABLED=true`).
 - API gateway exposed via reverse proxy on `443` only.
 - TLS 1.3 termination, HSTS, and automatic certificate renewal.
 - `CORS_ALLOWED_ORIGINS` set to explicit public client domains.
@@ -14,6 +15,9 @@ This document maps Message2 to the coursework requirement: a secure client-serve
 
 ## Corporate profile (private perimeter)
 
+- External lawful-access API **disabled**; state transparency UI off by default — see [lawful-access-transparency.md](../security/lawful-access-transparency.md).
+- **Encryption policy is admin-configurable** per instance/chat (from `metadata_only` up to `e2ee_strict`); no mandatory maximum — customer chooses in Admin Console.
+- **Connectivity mode** (install-time, auditable): `isolated` (single server) | `federation` (trusted corporate peers only) | `public_bridge` (controlled link to a public instance). Default recommended: `isolated` or `federation` without public bridge.
 - Access through VPN or private WAN only.
 - Internal PKI certificates and private DNS zones.
 - Firewall allows only required east-west service links.

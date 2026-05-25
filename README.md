@@ -111,10 +111,11 @@ This allows each deployment to decide identity rules without rewriting frontend 
 
 - TLS 1.3 for all transport links
 - E2EE protocol lifecycle documented in `docs/security/e2ee-design.md`
+- public vs corporate lawful access and user transparency: `docs/security/lawful-access-transparency.md`
 - optional privileged-access contour is isolated and audited in `services/access-audit`
-- user transparency events are emitted for all privileged access reads
+- user transparency events are emitted for all privileged access reads (public profile)
 - JWT bearer authentication for service endpoints
-- password hashing with bcrypt in auth flow
+- password hashing with Argon2id (legacy bcrypt verified on login)
 - secure API gateway baseline: Helmet, CORS allowlist, and rate limits
 - RBAC for privileged access (`admin` role required for audit reads)
 - media upload policy: MIME allowlist and upload size limits

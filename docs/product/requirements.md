@@ -19,6 +19,35 @@
 - Multi-device management UI.
 - Advanced moderation/admin features.
 
+## Deployment profiles (public vs corporate)
+
+Two operation modes from the same codebase (see `docs/ops/deployment-profiles.md`):
+
+| Profile | Audience | Lawful / state access | Encryption |
+|---------|----------|----------------------|------------|
+| **Public** | Internet, general users | Mandatory structured lawful API, user transparency, tombstones, complaints | Hybrid modes; honesty to users about what server can read |
+| **Corporate** | Organization perimeter | No external lawful API; internal audit/SIEM optional | **Admin-configurable** (`metadata_only` … full E2EE), not forced maximum |
+
+Corporate connectivity (install-time, auditable): `isolated` | `federation` (peer servers) | `public_bridge` (optional). Default: no bridge to public.
+
+**Implementation status:** [lawful-access-implementation-status.md](../security/lawful-access-implementation-status.md)  
+**Full policy/spec:** [lawful-access-transparency.md](../security/lawful-access-transparency.md)
+
+### Public profile — functional requirements (v2+)
+
+- Lawful operations rejected without `legalRef`, `reasonCode`, and minimum-length `reasonText`.
+- Narrow scope: explicit chat/message/user IDs or bounded time range.
+- Immutable audit log for every privileged read/export/restrict/delete.
+- User transparency: mandatory in-app notice; per-message indicator when applicable; tombstone after privileged delete.
+- User can view disclosure summary (`full` / `partial` / `sealed`) and file complaint to platform compliance (not to state bodies via app).
+- Push for transparency optional; in-app record not optional on public profile.
+
+### Corporate profile — functional requirements (v2+)
+
+- No user-facing “state access” badges unless customer enables internal transparency.
+- Instance admin sets encryption defaults and optional per-chat policies.
+- Optional federation between trusted corporate instances (mTLS, allowlist).
+
 ## Non-functional requirements (SLA/SLO)
 
 - API availability: 99.9% monthly.

@@ -36,7 +36,7 @@ pnpm db:reset         # dev: wipe Docker DB volume + migrate
 | `@message2/messaging` | `services/messaging` | 4001 | Auth, chats, WS, Prisma |
 | `@message2/media` | `services/media` | 4002 | Uploads, MinIO |
 | `@message2/notifications` | `services/notifications` | 4003 | Push orchestration |
-| `@message2/access-audit` | `services/access-audit` | 4004 | Privileged access audit |
+| `@message2/access-audit` | `services/access-audit` | 4004 | Privileged access audit (`POST /privileged/operations`) |
 | Shared types | `packages/contracts` | — | Cross-service contracts |
 
 Infra: `infra/docker` (Compose project name `message2`). Observability: `infra/observability`.
@@ -54,6 +54,8 @@ After `pnpm install`, local `.env` files are created by `scripts/setup-envs.mjs`
 - Requirements: `docs/product/requirements.md`
 - Threat model: `docs/security/threat-model.md`
 - E2EE: `docs/security/e2ee-design.md`
+- Lawful access / transparency (public vs corporate): `docs/security/lawful-access-transparency.md`
+- Lawful access **implementation status** (done / not done): `docs/security/lawful-access-implementation-status.md`
 - Deployment profiles (public vs corporate): `docs/ops/deployment-profiles.md`
 - Debian VPS: `docs/ops/deploy-debian-vps.md`
 

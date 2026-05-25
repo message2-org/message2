@@ -25,3 +25,7 @@
 - Server stores ciphertext, envelope metadata, and delivery receipts.
 - Server never receives plaintext content keys.
 - Privileged access can only read metadata by default.
+
+## Public encryption modes (deployment profile)
+
+On `DEPLOYMENT_PROFILE=public`, the instance may use a hybrid model (`e2ee_strict`, `server_encrypted`, `metadata_only`) so lawful access and user transparency remain technically consistent. **Corporate** profile: the instance admin sets defaults and per-chat ceilings/floors (`metadata_only` … `e2ee_strict`); stronger modes are encouraged but not mandatory. See [lawful-access-transparency.md](./lawful-access-transparency.md) §7.

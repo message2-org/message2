@@ -21,5 +21,6 @@
 - End-to-end message encryption (Double Ratchet family).
 - At-rest encryption for databases and object storage.
 - Isolated privileged API with mandatory audit.
-- Transparency notification for privileged reads.
+- Transparency notification for privileged reads (public profile); see [lawful-access-transparency.md](./lawful-access-transparency.md).
+- Mandatory reason, scope, and `legalRef` for lawful operations; tombstones and user complaints (public).
 - Rate limiting, anti-spam rules, anomaly detection.

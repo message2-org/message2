@@ -1,0 +1,31 @@
+{
+  "court_order": {
+    "labelRu": "Исполнение судебного акта",
+    "defaultDisclosure": "partial"
+  },
+  "criminal_investigation": {
+    "labelRu": "Уголовное преследование",
+    "defaultDisclosure": "sealed"
+  },
+  "counter_terrorism": {
+    "labelRu": "Противодействие терроризму",
+    "defaultDisclosure": "sealed"
+  },
+  "child_safety": {
+    "labelRu": "Защита несовершеннолетних",
+    "defaultDisclosure": "partial"
+  },
+  "spam_abuse_ori": {
+    "labelRu": "Нарушение правил платформы / ОРИ",
+    "defaultDisclosure": "full"
+  },
+  "account_compromise": {
+    "labelRu": "Компрометация учётной записи",
+    "defaultDisclosure": "full"
+  },
+  "other": {
+    "labelRu": "Иное",
+    "defaultDisclosure": "partial",
+    "minReasonTextLength": 200
+  }
+}
