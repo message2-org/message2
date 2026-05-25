@@ -31,7 +31,8 @@ Two operation modes from the same codebase (see `docs/ops/deployment-profiles.md
 Corporate connectivity (install-time, auditable): `isolated` | `federation` (peer servers) | `public_bridge` (optional). Default: no bridge to public.
 
 **Implementation status:** [lawful-access-implementation-status.md](../security/lawful-access-implementation-status.md)  
-**Full policy/spec:** [lawful-access-transparency.md](../security/lawful-access-transparency.md)
+**Full policy/spec:** [lawful-access-transparency.md](../security/lawful-access-transparency.md)  
+**Client build order (web, mobile, desktop):** [client-platform-roadmap.md](./client-platform-roadmap.md)
 
 ### Public profile — functional requirements (v2+)
 

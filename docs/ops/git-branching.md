@@ -38,6 +38,18 @@ feature/*      o--o      o--o
 - Anything touching auth, crypto, media, or multi-service behavior: use a short-lived `feature/*` branch.
 - Keep `main` deployable; do not develop day-to-day on `main`.
 
+## Multiple Cursor / cloud agents
+
+Use **claims + branches** together ([agent-coordination.md](./agent-coordination.md)):
+
+1. Pick a unique `task_id` (e.g. `track-b-push`); register `in_progress` in `docs/ai-context.md` §4.
+2. `git checkout develop && git pull && git checkout -b feature/<task_id>` — branch name matches `task_id`.
+3. Commit on that branch only; do not share one branch between two agent chats.
+4. Before PR: `git pull origin develop` (merge or rebase), run `pnpm build && pnpm test`.
+5. PR `feature/<task_id>` → `develop`; after merge, set claim `done`.
+
+Parallel agents on **different** `task_id` branches are safe; conflicts appear only when merging to `develop` if the same files changed.
+
 ## Protected branch recommendations (GitHub)
 
 - `main`: require PR, require CI, no force-push.
@@ -58,3 +70,4 @@ Set default branch to `develop` in GitHub only if the team agrees; otherwise kee
 
 - CI runs on pushes and PRs to `main` and `develop` (see `.github/workflows/ci.yml`).
 - Agent onboarding: [AGENTS.md](../../AGENTS.md).
+- Multi-agent claims + branches: [agent-coordination.md](./agent-coordination.md); Cursor rule: `.cursor/rules/agent-coordination.mdc`.

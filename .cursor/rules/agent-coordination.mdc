@@ -1,0 +1,29 @@
+---
+description: Multi-agent task claims, feature branches, and PR workflow
+alwaysApply: true
+---
+
+# Agent coordination (parallel Cursor / cloud sessions)
+
+Before writing code:
+
+1. Read `docs/ai-context.md` §4 **Active work (claims)**.
+2. **Derive `task_id` and `scope`** from the user's request if not provided (see `docs/ops/agent-coordination.md` — naming rules). State them in the first reply before claiming.
+3. If that `task_id` is `in_progress` for another owner (fresh claim), **stop** and report — do not edit the same scope.
+4. Claim the task: one table row — `in_progress`, `owner`, `since`, `scope`, `branch` = `feature/<task_id>`.
+5. Git: `git checkout develop && git pull && git checkout -b feature/<task_id>` (or checkout existing branch if resuming the same task).
+
+While working:
+
+- Commit only on `feature/<task_id>`; do not use `develop` for multi-file feature work in parallel with other agents.
+- One `task_id` per chat session; narrow `scope` (one service or web area).
+
+Before finishing:
+
+- `git pull origin develop` (merge or rebase on feature branch), run `pnpm build && pnpm test` when code changed.
+- Open or update PR: `feature/<task_id>` → `develop` (unless user asked for direct merge).
+- Release claim: `done` (merged), `needs_rework`, or `cancelled`; update `docs/ai-context.md` §2–§5.
+
+Full protocol: `docs/ops/agent-coordination.md`. Branching: `docs/ops/git-branching.md`.
+
+Do **not** add agent locks to `docs/product/requirements.md`.

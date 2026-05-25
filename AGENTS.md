@@ -6,8 +6,10 @@ Quick reference for working in this repository. Deep product/security docs live 
 
 | File | Purpose |
 |------|---------|
-| [docs/ai-context.md](docs/ai-context.md) | **Living status** — stack, scripts, active priorities, decision log |
-| [.cursor/rules/coursework-context.mdc](.cursor/rules/coursework-context.mdc) | **Immutable** coursework topic and guardrails (always applied in Cursor) |
+| [docs/ai-context.md](docs/ai-context.md) | **Living status** — stack, scripts, §4 claims, priorities, decision log |
+| [docs/ops/agent-coordination.md](docs/ops/agent-coordination.md) | **Multi-agent** — claim, `feature/<task_id>`, PR, release |
+| [.cursor/rules/coursework-context.mdc](.cursor/rules/coursework-context.mdc) | **Immutable** coursework topic (always applied) |
+| [.cursor/rules/agent-coordination.mdc](.cursor/rules/agent-coordination.mdc) | Claims + branches (always applied) |
 | [README.md](README.md) | Human onboarding, quick start, security overview |
 
 If chat memory conflicts with `docs/ai-context.md`, **prefer the file**.
@@ -35,8 +37,10 @@ pnpm db:reset         # dev: wipe Docker DB volume + migrate
 | `@message2/api-gateway` | `services/api-gateway` | 4000 | HTTP entry, proxy |
 | `@message2/messaging` | `services/messaging` | 4001 | Auth, chats, WS, Prisma |
 | `@message2/media` | `services/media` | 4002 | Uploads, MinIO |
-| `@message2/notifications` | `services/notifications` | 4003 | Push orchestration |
+| `@message2/notifications` | `services/notifications` | 4003 | Web Push + FCM dispatch, subscription store |
 | `@message2/access-audit` | `services/access-audit` | 4004 | Privileged access audit (`POST /privileged/operations`) |
+| `@message2/lawful-access` | `services/lawful-access` | 4005 | Public lawful API (`POST /lawful/v1/operations`, mTLS/IP allowlist) |
+| `@message2/admin` | `apps/admin` | 5174 | Install wizard + complaint queue (admin JWT) |
 | Shared types | `packages/contracts` | — | Cross-service contracts |
 
 Infra: `infra/docker` (Compose project name `message2`). Observability: `infra/observability`.
@@ -52,36 +56,43 @@ After `pnpm install`, local `.env` files are created by `scripts/setup-envs.mjs`
 ## Key docs
 
 - Requirements: `docs/product/requirements.md`
+- Client platforms (order: web → Android → desktop → iOS): `docs/product/client-platform-roadmap.md`
 - Threat model: `docs/security/threat-model.md`
 - E2EE: `docs/security/e2ee-design.md`
 - Lawful access / transparency (public vs corporate): `docs/security/lawful-access-transparency.md`
 - Lawful access **implementation status** (done / not done): `docs/security/lawful-access-implementation-status.md`
 - Deployment profiles (public vs corporate): `docs/ops/deployment-profiles.md`
 - Debian VPS: `docs/ops/deploy-debian-vps.md`
+- Multi-agent workflow: [docs/ops/agent-coordination.md](docs/ops/agent-coordination.md)
 
 ## Git branches
 
 - Integrate on **`develop`**; keep **`main`** for releases/tags.
+- **Agents:** one `task_id` → `feature/<task_id>` → PR → `develop` (see agent-coordination).
 - Branch naming: `feature/…`, `fix/…`, `chore/…` from `develop`.
 - Full model: [docs/ops/git-branching.md](docs/ops/git-branching.md).
 
 ## New agent / cloud agent handoff
 
-1. Read [docs/ai-context.md](docs/ai-context.md) §6 (handoff prompt).
-2. Read [lawful-access-implementation-status.md](docs/security/lawful-access-implementation-status.md) § Planned next.
-3. Default continuation: **lawful access P3** unless the user chooses v1 messenger gaps.
+1. Read [docs/ai-context.md](docs/ai-context.md) §4 **claims** and §6 (handoff prompt).
+2. Read [docs/ops/agent-coordination.md](docs/ops/agent-coordination.md) — agent may **derive** `task_id` + `scope` from your task text; claim, branch `feature/<task_id>`, PR when done.
+3. Read [lawful-access-implementation-status.md](docs/security/lawful-access-implementation-status.md) § Planned next.
+4. Default continuation: **Track D Android** (Track B push done) unless the user specifies otherwise.
 
-Lawful flow env: `INTERNAL_SERVICE_SECRET` must match in `services/messaging` and `services/access-audit`.
+Lawful flow env: `INTERNAL_SERVICE_SECRET` must match in `services/messaging`, `services/access-audit`, and `services/lawful-access`. Public external API: `LAWFUL_API_SHARED_SECRET` (dev) or `LAWFUL_MTLS_REQUIRED=true` behind TLS.
 
 ```bash
 pnpm --filter @message2/contracts test
 pnpm --filter @message2/access-audit test
+pnpm --filter @message2/lawful-access test
 pnpm --filter @message2/messaging test
 ```
 
 ## When finishing a task
 
-Update **sections 2–5** in `docs/ai-context.md` (status, priorities, short decision-log line). Update **lawful-access-implementation-status.md** checkboxes/changelog. Do not change section 1 (coursework topic).
+1. Set the claim row in `docs/ai-context.md` §4 to `done`, `needs_rework`, or `cancelled` (see [agent-coordination.md](docs/ops/agent-coordination.md)).
+2. Update **sections 2–5** in `docs/ai-context.md` (status, priorities, short decision-log line).
+3. Update **lawful-access-implementation-status.md** checkboxes/changelog when lawful-related. Do not change section 1 (coursework topic).
 
 ## Security note
 

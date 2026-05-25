@@ -4,7 +4,7 @@
 
 Spec: [lawful-access-transparency.md](./lawful-access-transparency.md) · Phases: §13 there.
 
-Last updated: **2026-05-24** (P1–P2 done; handoff for new agents)
+Last updated: **2026-05-25** (P1–P3 done; handoff for new agents)
 
 ---
 
@@ -39,8 +39,10 @@ Last updated: **2026-05-24** (P1–P2 done; handoff for new agents)
 
 | Item | Status | Notes |
 |------|--------|-------|
-| `DEPLOYMENT_PROFILE` env wiring | 🟡 | `services/access-audit/.env.example` |
-| `LAWFUL_ACCESS_ENABLED` forced off for corporate | 🟡 | Validated in `validatePrivilegedOperationRequest` + config |
+| `DEPLOYMENT_PROFILE` env wiring | ✅ | All core services + compose `MESSAGE2_DEPLOYMENT_PROFILE` |
+| `LAWFUL_ACCESS_ENABLED` forced off for corporate | ✅ | `resolveLawfulAccessEnabled` in `@message2/contracts` |
+| Messaging user transparency guards | ✅ | Corporate: no notices/WS/complaint API; `GET /instance/profile` |
+| `CORPORATE_CONNECTIVITY_MODE` env | ✅ | Documented + health/instance profile |
 | README / AGENTS pointers | ✅ | |
 
 ### P1 — Contracts & audit validation
@@ -53,8 +55,10 @@ Last updated: **2026-05-24** (P1–P2 done; handoff for new agents)
 | `POST /privileged/operations` with full validation | ✅ | `services/access-audit` |
 | `POST /privileged/read` legacy mapper | ✅ | Maps to operations schema |
 | Reject without `legalRef` / `reasonCode` / scope | ✅ | 400 + `validation_failed` |
+| Duplicate `legalRef` → 409 | ✅ | `access-audit` in-memory store |
 | Unit tests (contracts + access-audit) | ✅ | `pnpm --filter @message2/contracts test` |
-| Persistent audit store (Postgres) | ⬜ | In-memory array in `store.ts` |
+| `POST /internal/privileged/operations` | ✅ | `x-internal-secret`; used by `lawful-access` |
+| Persistent audit store (Postgres) | ✅ | `privileged_audit_events`; `AUDIT_STORE=postgres` (tests: `memory`) |
 | Notify notifications service | 🟡 | fire-and-forget `fetch` (warn if down) |
 
 ### P2 — Transparency UX & tombstones
@@ -64,44 +68,45 @@ Last updated: **2026-05-24** (P1–P2 done; handoff for new agents)
 | Tombstone model in `messaging` (Prisma) | ✅ | Migration `20260524120000_transparency_tombstones` |
 | `POST /internal/transparency` | ✅ | `x-internal-secret`; called from access-audit |
 | `GET /transparency/notices` | ✅ | Per-user notices |
-| `notifications` → real fanout | 🟡 | Still stub; WS is primary |
+| `notifications` → real fanout | ✅ | Web Push + FCM legacy; dry-run without VAPID/FCM keys |
 | Web client badge on message | ✅ | 🕶️ on `message.disclosure` |
 | Web transparency banner | ✅ | On `transparency.notice` WS |
-| Web transparency detail screen | ⬜ | Complaint UI (P4) |
+| Web transparency detail screen | ✅ | Modal + complaint form (`TransparencyDetailModal`) |
 | WS delivery of transparency events | ✅ | `transparency.notice`, `message.disclosure`, `message.tombstone` |
 
 ### P3 — Lawful-access gateway
 
 | Item | Status | Notes |
 |------|--------|-------|
-| `services/lawful-access` | ⬜ | |
-| `POST /lawful/v1/operations` | ⬜ | |
-| mTLS / IP allowlist | ⬜ | |
-| Gateway route (public only) | ⬜ | |
+| `services/lawful-access` | ✅ | Port 4005; `pnpm dev:lawful` |
+| `POST /lawful/v1/operations` | ✅ | 202 + `lawfulApiBodyToOperation`; forwards to access-audit |
+| mTLS / IP allowlist | 🟡 | `LAWFUL_MTLS_REQUIRED`, headers `x-ssl-client-verify` / forwarded cert; dev `x-lawful-api-secret` |
+| Gateway route (public only) | ✅ | `api-gateway` `/lawful` proxy; 404 on corporate |
 
 ### P4 — Complaints & Admin Console
 
 | Item | Status | Notes |
 |------|--------|-------|
-| `Complaint` entity + API | ⬜ | |
-| `apps/admin` | ⬜ | |
-| Install wizard (profile + connectivity) | ⬜ | |
+| `Complaint` entity + API | ✅ | Prisma `complaints`; internal + admin routes in `access-audit` |
+| User complaint via messaging | ✅ | `POST /transparency/complaints`, `GET /transparency/notices/:eventId` |
+| `apps/admin` | ✅ | `pnpm dev:admin` :5174 |
+| Install wizard (profile + connectivity) | 🟡 | Local config MVP in admin UI |
 
 ### P5 — Encryption policy (corporate flexible + public hybrid)
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Instance encryption defaults (admin) | ⬜ | |
-| Per-chat mode | ⬜ | |
-| DM mutual consent for downgrade | ⬜ | |
+| Instance encryption defaults (admin) | ✅ | `instance_settings` + `PUT /admin/encryption/policy` |
+| Per-chat mode | ✅ | `Chat.encryptionMode`, `GET/POST /chats/:id/encryption` |
+| DM mutual consent for downgrade | ✅ | `encryption_downgrade_requests` + web consent banner |
 | Client E2EE (Double Ratchet) | ⬜ | See also `ai-context` media E2EE priority |
 
 ### P6 — Compliance ops
 
 | Item | Status | Notes |
 |------|--------|-------|
-| SIEM export for audit | ⬜ | |
-| Legal runbook templates | ⬜ | |
+| SIEM export for audit | ✅ | `GET /admin/audit/export`, `POST /admin/siem/forward` |
+| Legal runbook templates | ✅ | `docs/ops/compliance/*.md` |
 
 ---
 
@@ -116,15 +121,16 @@ Last updated: **2026-05-24** (P1–P2 done; handoff for new agents)
 
 ---
 
-## Planned next (for new agents — 2026-05-24)
+## Planned next (for new agents — 2026-05-25)
 
-| Priority | Phase | Task |
+Lawful access **P0–P6** is complete. Default product work:
+
+| Priority | Track | Task |
 |----------|-------|------|
-| 1 | P3 | New `services/lawful-access`, `/lawful/v1/operations`, gateway (public only), mTLS |
-| 2 | P1 | Postgres append-only audit (replace `access-audit` in-memory store) |
-| 3 | P4 | Complaints API + web detail screen + `apps/admin` install wizard |
-| 4 | P0 | Wire `DEPLOYMENT_PROFILE` / `LAWFUL_ACCESS_ENABLED` in compose + runtime guards |
-| alt | v1 | Message edit/delete/react; receipts/typing/presence; real push |
+| 1 | B | Web messenger v1 + **real push** (FCM/Web Push) |
+| 2 | D | Android client (`apps/android`) after web + push stable |
+| 3 | D | Desktop via Tauri (Linux/Windows/macOS) — see `docs/product/client-platform-roadmap.md` |
+| alt | C | E2EE / media client encryption |
 
 **Develop commits (local, may need push):** `ab86195` docs → `e758c76` P1 → `25f178d` messaging P2 → `9973eeb` web P2.
 
@@ -136,18 +142,20 @@ Last updated: **2026-05-24** (P1–P2 done; handoff for new agents)
 |------|----------|--------------|---------|
 | Monorepo layout | AGENTS / ai-context | Matches `apps/web`, `services/*`, `packages/contracts` | ✅ |
 | Lawful access P1–P2 | spec | Implemented (see phases above) | ✅ |
-| Lawful access P3–P6 | spec | Not started | ⬜ planned |
-| `DEPLOYMENT_PROFILE` | deployment-profiles | `access-audit` `.env.example` only | 🟡 |
+| Lawful access P3 | spec | `lawful-access` + gateway `/lawful` | ✅ |
+| Lawful access P4–P6 | spec | Not started | ⬜ planned |
+| `DEPLOYMENT_PROFILE` | deployment-profiles | contracts helper + all services | ✅ |
 | E2EE | e2ee-design, README | `cipherText` JSON/plain; no Double Ratchet | ⬜ |
 | Argon2id | deployment-profiles | Implemented in messaging | ✅ (README was stale; fixed) |
 | Refresh rotation | ai-context priority | `/auth/refresh` rotates + revokes | 🟡 partial vs “production-grade” |
-| v1: edit/delete/react messages | requirements v1 | No API routes | ❌ gap |
-| v1: read receipts / typing / presence | requirements v1 | WS only `message.created`; UI placeholders | ❌ gap |
+| v1: edit/delete/react messages | requirements v1 | PATCH/DELETE/reply/reactions routes + web | ✅ |
+| v1: read receipts / typing / presence | requirements v1 | `POST /read`, `/typing`, WS events, web UI | ✅ |
 | v1: phone/email login | requirements v1 | username only; email/phone in private profile | 🟡 |
-| v1: push | requirements v1 | notifications stub | ⬜ |
+| v1: push | requirements v1 | Web Push + FCM + messaging dispatch | ✅ |
 | Media MinIO | ai-context [x] | `media` + `mediaId` on messages | ✅ |
-| Android | ai-context priority | README stub only | ⬜ planned |
-| Discovery sidebar mock | — | `SidebarDiscovery` uses `mockRows`; API `/discover` exists | 🟡 UI drift |
+| Android | client-platform-roadmap Phase 3 | `apps/android` stub only | ⬜ after web v1 + push |
+| Desktop / iOS | client-platform-roadmap Phase 4–5 | not in repo | ⬜ planned (Tauri / iOS TBD) |
+| Discovery sidebar mock | — | v2 tabs show placeholder; chats/channels/users use API | ✅ |
 
 ---
 
@@ -155,6 +163,14 @@ Last updated: **2026-05-24** (P1–P2 done; handoff for new agents)
 
 | Date | Change |
 |------|--------|
+| 2026-05-25 | Multi-agent: `docs/ops/agent-coordination.md`, claims in ai-context §4, `.cursor/rules/agent-coordination.mdc` |
+| 2026-05-25 | Added `docs/product/client-platform-roadmap.md` (web → push → Android → desktop → iOS) |
+| 2026-05-25 | **P6 implemented:** SIEM NDJSON/CEF export, webhook forward, compliance runbooks |
+| 2026-05-25 | **P5 implemented:** encryption modes, instance policy, DM downgrade mutual consent |
+| 2026-05-25 | **P0 implemented:** shared deployment profile helpers; corporate transparency/lawful guards |
+| 2026-05-25 | **P4 implemented:** complaints table/API, web transparency modal, `apps/admin` |
+| 2026-05-25 | **P1 Postgres audit:** `privileged_audit_events` migration, Prisma store in `access-audit` |
+| 2026-05-25 | **P3 implemented:** `lawful-access`, gateway `/lawful`, internal audit route, 409 duplicate `legalRef` |
 | 2026-05-24 | Handoff section + audit refresh; P1–P2 marked done for new agents |
 | 2026-05-24 | **P2 implemented:** Prisma tombstones/disclosures/notices, internal transparency API, WS + web badge/banner |
 | 2026-05-24 | **P1 implemented:** contracts validation, `POST /privileged/operations`, env example, tests |
