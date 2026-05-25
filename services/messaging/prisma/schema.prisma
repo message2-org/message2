@@ -16,46 +16,71 @@ model User {
   role           UserRole         @default(user)
   createdAt      DateTime         @default(now())
   chats          ChatMember[]
-  sentMessages   Message[]        @relation("SenderMessages")
+  sentMessages   Message[]         @relation("SenderMessages")
+  messageReactions MessageReaction[]
   refreshSession RefreshSession[]
   privateProfile UserPrivateProfile?
   transparencyNotices TransparencyUserNotice[]
 }
 
 model Chat {
-  id        String       @id @default(uuid()) @db.Uuid
-  title     String
-  createdAt DateTime     @default(now())
-  members   ChatMember[]
-  messages  Message[]
-  disclosures MessageDisclosure[]
-  tombstones MessageTombstone[]
+  id              String       @id @default(uuid()) @db.Uuid
+  title           String
+  encryptionMode  String?      @map("encryption_mode")
+  createdAt       DateTime     @default(now())
+  members         ChatMember[]
+  messages        Message[]
+  disclosures     MessageDisclosure[]
+  tombstones      MessageTombstone[]
+  downgradeRequests EncryptionDowngradeRequest[]
 }
 
 model ChatMember {
-  chatId    String   @db.Uuid
-  userId    String   @db.Uuid
-  joinedAt  DateTime @default(now())
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId     String    @db.Uuid
+  userId     String    @db.Uuid
+  joinedAt   DateTime  @default(now())
+  lastReadAt DateTime? @map("last_read_at")
+  chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([chatId, userId])
   @@index([userId, chatId])
 }
 
 model Message {
-  id         String    @id @default(uuid()) @db.Uuid
-  chatId     String    @db.Uuid
-  senderId   String    @db.Uuid
-  cipherText String
-  sentAt     DateTime  @default(now())
-  kind       String    @default("text")
-  mediaId    String?   @db.Uuid
-  chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  sender     User      @relation("SenderMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  disclosures MessageDisclosure[]
+  id               String    @id @default(uuid()) @db.Uuid
+  chatId           String    @db.Uuid
+  senderId         String    @db.Uuid
+  cipherText       String
+  sentAt           DateTime  @default(now())
+  kind             String    @default("text")
+  mediaId          String?   @db.Uuid
+  editedAt         DateTime? @map("edited_at")
+  deletedAt        DateTime? @map("deleted_at")
+  deletedByUserId  String?   @map("deleted_by_user_id") @db.Uuid
+  replyToMessageId String?   @map("reply_to_message_id") @db.Uuid
+  chat             Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender           User      @relation("SenderMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo          Message?  @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies          Message[] @relation("MessageReplies")
+  disclosures      MessageDisclosure[]
+  reactions        MessageReaction[]
 
   @@index([chatId, sentAt(sort: Desc)])
+  @@index([replyToMessageId])
+}
+
+model MessageReaction {
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([messageId])
+  @@map("message_reactions")
 }
 
 model MessageDisclosure {
@@ -127,6 +152,34 @@ model UserPrivateProfile {
   keyVersion     Int
   updatedAt      DateTime @updatedAt
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InstanceSettings {
+  id                    String   @id @default("default")
+  defaultEncryptionMode String   @map("default_encryption_mode")
+  minEncryptionMode     String   @map("min_encryption_mode")
+  maxEncryptionMode     String   @map("max_encryption_mode")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  updatedBy             String?  @map("updated_by") @db.Uuid
+
+  @@map("instance_settings")
+}
+
+model EncryptionDowngradeRequest {
+  id                   String    @id @default(uuid()) @db.Uuid
+  chatId               String    @map("chat_id") @db.Uuid
+  requestedMode        String    @map("requested_mode")
+  requestedByUserId    String    @map("requested_by_user_id") @db.Uuid
+  peerUserId           String    @map("peer_user_id") @db.Uuid
+  status               String    @default("pending")
+  requesterConsentedAt DateTime  @default(now()) @map("requester_consented_at")
+  peerConsentedAt      DateTime? @map("peer_consented_at")
+  resolvedAt           DateTime? @map("resolved_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  chat                 Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, status])
+  @@map("encryption_downgrade_requests")
 }
 
 enum UserRole {

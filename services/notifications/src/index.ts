@@ -1,23 +1,7 @@
-import cors from "cors";
-import express from "express";
+import { createApp } from "./app.js";
+import { config } from "./config.js";
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+process.loadEnvFile?.();
 
-app.get("/health", (_req, res) => res.json({ ok: true, service: "notifications" }));
-
-app.post("/notifications/transparency", (req, res) => {
-  res.status(202).json({
-    delivered: true,
-    type: "privileged_access_notice",
-    payload: req.body
-  });
-});
-
-app.post("/notifications/push", (req, res) => {
-  res.status(202).json({ delivered: true, provider: "fcm-webpush", payload: req.body });
-});
-
-const port = Number(process.env.PORT ?? 4003);
-app.listen(port, () => console.log(`notifications listening on :${port}`));
+const app = createApp();
+app.listen(config.port, () => console.log(`notifications listening on :${config.port}`));

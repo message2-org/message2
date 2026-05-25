@@ -13,6 +13,8 @@ export type ChatItem = {
   id: string;
   group: ChatGroup;
   kind?: "dm" | "group";
+  /** DM peer user id (for presence). */
+  peerUserId?: string;
   /** DM peer username (other user), for search by @handle */
   peerUsername?: string;
   name: string;
@@ -31,6 +33,19 @@ export type MessageDisclosure = {
   disclosureLevel: "full" | "partial" | "sealed";
 };
 
+export type MessageReaction = {
+  emoji: string;
+  count: number;
+  reactedByMe?: boolean;
+};
+
+export type MessageReplyPreview = {
+  id: string;
+  author: string;
+  text: string;
+  isDeleted?: boolean;
+};
+
 export type Message = {
   id: string;
   sender: "me" | "them";
@@ -45,6 +60,10 @@ export type Message = {
   disclosure?: MessageDisclosure;
   isTombstone?: boolean;
   tombstoneLabel?: string;
+  isDeleted?: boolean;
+  editedAt?: string;
+  replyTo?: MessageReplyPreview;
+  reactions?: MessageReaction[];
 };
 
 export type TransparencyBanner = {
@@ -52,6 +71,39 @@ export type TransparencyBanner = {
   summary: string;
   action: string;
   createdAt: string;
+};
+
+export type ComplaintRecord = {
+  id: string;
+  eventId: string;
+  userId: string;
+  body: string;
+  status: string;
+  outcomeSummary?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TransparencyDetailResponse = {
+  notice: {
+    id: string;
+    eventId: string;
+    action: string;
+    scope: Record<string, unknown>;
+    disclosureLevel: string;
+    summary: string | null;
+    createdAt: string;
+    readAt: string | null;
+  };
+  event: {
+    eventId: string;
+    action: string;
+    scope: Record<string, unknown>;
+    disclosureLevel: string;
+    summary: string;
+    createdAt: string;
+  };
+  complaint: ComplaintRecord | null;
 };
 
 export type PendingAttachment = {

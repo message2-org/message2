@@ -15,7 +15,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
 - Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
-- **Git (2026-05-24):** branch `develop`, commits `ab86195`…`9973eeb` (lawful access docs + P1 + P2); may be ahead of `origin/develop` until `git push`.
+- **Git:** branch `develop`; lawful P0–P6 + messenger v1 + push landed on `develop` (see §5 / `git log`).
 - Current local run mode:
   - `pnpm install`
   - Infra (PostgreSQL/Redis/MinIO): `pnpm infra:up` / `pnpm infra:down`
@@ -66,7 +66,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - [x] Lawful access **P0:** shared profile helpers; corporate disables user transparency + lawful API.
 - [x] Lawful access **P5:** encryption modes in contracts/DB; admin policy UI; DM downgrade consent in web.
 - [x] Lawful access **P6:** SIEM NDJSON/CEF export, webhook forward, compliance runbooks.
-- [x] Track B (partial): message actions, read/typing/presence WS, discovery placeholder fix.
+- [x] Track B: message edit/delete/reply/react; read/typing/presence WS; Web Push + FCM dispatch; discovery v2 placeholder.
 
 ### Active work (claims) — multi-agent
 
@@ -78,7 +78,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 
 ### Planned next (pick one track for new agents)
 
-**Default product line:** finish **web messenger v1** + **push backend**, then **Android**; desktop (Tauri) and iOS later — full order in `docs/product/client-platform-roadmap.md`.
+**Default product line:** **Android** (`apps/android`) after stable web API; optional web polish; desktop (Tauri) / iOS later — `docs/product/client-platform-roadmap.md`.
 
 **Track A — Lawful access**
 
@@ -118,6 +118,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-24: Git branching: `develop` for integration, `main` for releases; see `docs/ops/git-branching.md`.
 - 2026-05-24: Added root `.gitignore`, `AGENTS.md`, README AI section; stopped tracking `dist/`, `node_modules/`, and `*.env`.
 - 2026-05-24: Lawful access P1 — contracts + `access-audit` `/privileged/operations`.
+- 2026-05-25: Landed batch on `develop`: lawful P3–P6, `apps/admin`, messenger v1 actions/realtime, push notifications.
 - 2026-05-25: Track B push — `notifications` Web Push/FCM, Prisma subscriptions, web SW + subscribe, messaging `notifyMessagePush`.
 - 2026-05-25: Track B — message edit/delete/reply/react; read receipts + typing + presence; discovery tabs without mocks.
 - 2026-05-25: Lawful access P6 — SIEM export/forward + `docs/ops/compliance/` runbook templates.

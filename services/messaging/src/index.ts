@@ -9,10 +9,21 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import jwt from "jsonwebtoken";
 import { PrismaClient, type User } from "@prisma/client";
-import type { EncryptedEnvelope, MessageDisclosureMark } from "@message2/contracts";
 import { loadMasterKeys } from "./key-provider.js";
-import { broadcastToUsers, registerSocket, unregisterSocket } from "./realtime.js";
+import {
+  broadcastToUsers,
+  getUserIdForSocket,
+  isUserConnected,
+  registerSocket,
+  unregisterSocket
+} from "./realtime.js";
+import { notifyPresenceForUser } from "./realtime-presence.js";
+import { registerMessageRoutes } from "./message-routes.js";
 import { applyTransparencyEvent, type TransparencyIngressPayload } from "./transparency.js";
+import { instanceConfig } from "./instance-config.js";
+import { requireUserTransparency } from "./profile-guards.js";
+import { registerEncryptionRoutes } from "./encryption-routes.js";
+import { ensureInstanceEncryptionPolicy } from "./encryption-policy.js";
 
 process.loadEnvFile?.();
 
@@ -24,6 +35,17 @@ app.use(rateLimit({ windowMs: 60_000, limit: 200, standardHeaders: true, legacyH
 
 const jwtSecret = process.env.JWT_SECRET ?? "change-me-in-production";
 const internalServiceSecret = process.env.INTERNAL_SERVICE_SECRET ?? "change-me-internal";
+const accessAuditUrl = process.env.ACCESS_AUDIT_URL ?? "http://localhost:4004";
+
+const auditInternalFetch = (path: string, init?: RequestInit) =>
+  fetch(`${accessAuditUrl}${path}`, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      "x-internal-secret": internalServiceSecret,
+      ...(init?.headers ?? {})
+    }
+  });
 const accessTokenTtl = process.env.ACCESS_TOKEN_TTL ?? "15m";
 const refreshTokenTtl = process.env.REFRESH_TOKEN_TTL ?? "30d";
 const argonMemoryCost = Number(process.env.ARGON2_MEMORY_KB ?? "65536");
@@ -49,13 +71,6 @@ let keyInitLastError: string | null = null;
 type AuthPayload = { sub: string; role: "user" | "admin" };
 type RefreshPayload = { sub: string; role: "user" | "admin"; typ: "refresh" };
 type AuthRequest = express.Request & { auth?: AuthPayload };
-type EncryptedEnvelopeWithSender = EncryptedEnvelope & {
-  senderDisplayName?: string;
-  disclosure?: MessageDisclosureMark;
-  isTombstone?: boolean;
-  tombstoneLabel?: string;
-};
-
 const auth = (req: AuthRequest, res: express.Response, next: express.NextFunction) => {
   const header = req.header("authorization") ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
@@ -769,9 +784,26 @@ app.get("/health/ready", (_req, res) => {
     ok: true,
     service: "messaging",
     ready: true,
-    keyProvider
+    keyProvider,
+    deploymentProfile: instanceConfig.deploymentProfile,
+    lawfulAccessEnabled: instanceConfig.lawfulAccessEnabled,
+    userTransparencyEnabled: instanceConfig.userTransparencyEnabled,
+    corporateConnectivity: instanceConfig.corporateConnectivity
   });
 });
+
+app.get("/instance/profile", async (_req, res) => {
+  const encryptionPolicy = await ensureInstanceEncryptionPolicy(prisma);
+  res.json({
+    deploymentProfile: instanceConfig.deploymentProfile,
+    lawfulAccessEnabled: instanceConfig.lawfulAccessEnabled,
+    userTransparencyEnabled: instanceConfig.userTransparencyEnabled,
+    corporateConnectivity: instanceConfig.corporateConnectivity,
+    encryptionPolicy
+  });
+});
+
+registerEncryptionRoutes({ app, prisma, auth, requireAdmin });
 
 app.post("/chats", auth, async (req: AuthRequest, res) => {
   try {
@@ -834,11 +866,16 @@ app.post("/chats", auth, async (req: AuthRequest, res) => {
 
 app.get("/chats", auth, async (req: AuthRequest, res) => {
   try {
+    const me = req.auth!.sub;
     const rows = await prisma.chat.findMany({
-      where: { members: { some: { userId: req.auth!.sub } } },
+      where: { members: { some: { userId: me } } },
       include: {
-        members: { include: { user: { select: { id: true, displayName: true, username: true } } } },
-        messages: { orderBy: { sentAt: "desc" }, take: 1 }
+        members: {
+          include: {
+            user: { select: { id: true, displayName: true, username: true } }
+          }
+        },
+        messages: { orderBy: { sentAt: "desc" }, take: 1, where: { deletedAt: null } }
       },
       orderBy: { createdAt: "desc" }
     });
@@ -846,6 +883,19 @@ app.get("/chats", auth, async (req: AuthRequest, res) => {
     const chats = rows.map((chat) => {
       const lastMessage = chat.messages[0] ?? null;
       const kind = chat.members.length <= 2 ? "dm" : "group";
+      const peerMember =
+        kind === "dm" ? chat.members.find((member) => member.userId !== me) : undefined;
+      const myMember = chat.members.find((member) => member.userId === me);
+      const peerLastReadAt = peerMember?.lastReadAt?.toISOString() ?? null;
+      const lastDelivery =
+        lastMessage &&
+        lastMessage.senderId === me &&
+        peerLastReadAt &&
+        new Date(peerLastReadAt).getTime() >= lastMessage.sentAt.getTime()
+          ? ("read" as const)
+          : lastMessage && lastMessage.senderId === me
+            ? ("sent" as const)
+            : null;
       return {
         id: chat.id,
         title: chat.title,
@@ -853,8 +903,13 @@ app.get("/chats", auth, async (req: AuthRequest, res) => {
         members: chat.members.map((member) => ({
           id: member.user.id,
           displayName: member.user.displayName,
-          username: member.user.username
+          username: member.user.username,
+          lastReadAt: member.lastReadAt?.toISOString() ?? null
         })),
+        peerUserId: peerMember?.userId,
+        peerStatus: peerMember ? (isUserConnected(peerMember.userId) ? "online" : "offline") : undefined,
+        myLastReadAt: myMember?.lastReadAt?.toISOString() ?? null,
+        lastDelivery,
         lastMessage: lastMessage
           ? {
               id: lastMessage.id,
@@ -962,82 +1017,9 @@ const isChatMember = async (chatId: string, userId: string) => {
   return Boolean(membership);
 };
 
-app.get("/chats/:chatId/messages", auth, async (req: AuthRequest, res) => {
-  const chatId = req.params.chatId;
-  if (!(await isChatMember(chatId, req.auth!.sub))) {
-    res.status(403).json({ error: "chat access denied" });
-    return;
-  }
+registerMessageRoutes(app, { prisma, auth, isChatMember });
 
-  const [rows, disclosures, tombstones] = await Promise.all([
-    prisma.message.findMany({
-      where: { chatId },
-      orderBy: { sentAt: "asc" },
-      include: {
-        sender: { select: { displayName: true } },
-        disclosures: true
-      }
-    }),
-    prisma.messageDisclosure.findMany({ where: { chatId } }),
-    prisma.messageTombstone.findMany({ where: { chatId }, orderBy: { deletedAt: "asc" } })
-  ]);
-
-  const disclosureByMessage = new Map<string, MessageDisclosureMark>();
-  for (const row of rows) {
-    const latest = row.disclosures[row.disclosures.length - 1];
-    if (latest) {
-      disclosureByMessage.set(row.id, {
-        eventId: latest.eventId,
-        action: latest.action as MessageDisclosureMark["action"],
-        disclosureLevel: latest.disclosureLevel as MessageDisclosureMark["disclosureLevel"]
-      });
-    }
-  }
-  for (const item of disclosures) {
-    if (!disclosureByMessage.has(item.messageId)) {
-      disclosureByMessage.set(item.messageId, {
-        eventId: item.eventId,
-        action: item.action as MessageDisclosureMark["action"],
-        disclosureLevel: item.disclosureLevel as MessageDisclosureMark["disclosureLevel"]
-      });
-    }
-  }
-
-  const envelopes: EncryptedEnvelopeWithSender[] = rows.map((row) => ({
-    id: row.id,
-    chatId: row.chatId,
-    senderId: row.senderId,
-    cipherText: row.cipherText,
-    sentAt: row.sentAt.toISOString(),
-    kind: row.kind,
-    mediaId: row.mediaId ?? undefined,
-    senderDisplayName: row.sender.displayName,
-    disclosure: disclosureByMessage.get(row.id)
-  }));
-
-  for (const tomb of tombstones) {
-    envelopes.push({
-      id: tomb.messageId,
-      chatId: tomb.chatId,
-      senderId: tomb.senderId ?? "00000000-0000-0000-0000-000000000000",
-      cipherText: "",
-      sentAt: (tomb.sentAt ?? tomb.deletedAt).toISOString(),
-      kind: tomb.kind ?? "text",
-      isTombstone: true,
-      tombstoneLabel: tomb.label,
-      disclosure: {
-        eventId: tomb.eventId,
-        action: "message_delete",
-        disclosureLevel: "partial"
-      }
-    });
-  }
-
-  envelopes.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
-  res.json(envelopes);
-});
-
-app.get("/transparency/notices", auth, async (req: AuthRequest, res) => {
+app.get("/transparency/notices", auth, requireUserTransparency, async (req: AuthRequest, res) => {
   const notices = await prisma.transparencyUserNotice.findMany({
     where: { userId: req.auth!.sub },
     orderBy: { createdAt: "desc" },
@@ -1055,6 +1037,99 @@ app.get("/transparency/notices", auth, async (req: AuthRequest, res) => {
       readAt: notice.readAt?.toISOString() ?? null
     }))
   );
+});
+
+app.get("/transparency/notices/:eventId", auth, requireUserTransparency, async (req: AuthRequest, res) => {
+  const eventId = req.params.eventId;
+  const notice = await prisma.transparencyUserNotice.findFirst({
+    where: { userId: req.auth!.sub, eventId }
+  });
+  if (!notice) {
+    res.status(404).json({ error: "notice_not_found" });
+    return;
+  }
+
+  let event: Record<string, unknown> | null = null;
+  let complaint: unknown = null;
+  try {
+    const [eventRes, complaintRes] = await Promise.all([
+      auditInternalFetch(`/internal/transparency/${encodeURIComponent(eventId)}`),
+      auditInternalFetch(
+        `/internal/complaints/lookup?eventId=${encodeURIComponent(eventId)}&userId=${encodeURIComponent(req.auth!.sub)}`
+      )
+    ]);
+    if (eventRes.ok) {
+      event = (await eventRes.json()) as Record<string, unknown>;
+    }
+    if (complaintRes.ok) {
+      const body = (await complaintRes.json()) as { complaint: unknown };
+      complaint = body.complaint;
+    }
+  } catch (error) {
+    console.warn("[transparency/notices/:eventId] audit lookup failed", error);
+  }
+
+  res.json({
+    notice: {
+      id: notice.id,
+      eventId: notice.eventId,
+      action: notice.action,
+      scope: JSON.parse(notice.scopeJson),
+      disclosureLevel: notice.disclosureLevel,
+      summary: notice.summary,
+      createdAt: notice.createdAt.toISOString(),
+      readAt: notice.readAt?.toISOString() ?? null
+    },
+    event:
+      event ??
+      ({
+        eventId: notice.eventId,
+        action: notice.action,
+        scope: JSON.parse(notice.scopeJson),
+        disclosureLevel: notice.disclosureLevel,
+        summary: notice.summary ?? "",
+        createdAt: notice.createdAt.toISOString()
+      } as Record<string, unknown>),
+    complaint
+  });
+});
+
+app.post("/transparency/complaints", auth, requireUserTransparency, async (req: AuthRequest, res) => {
+  const body = req.body as { eventId?: string; text?: string };
+  const eventId = typeof body.eventId === "string" ? body.eventId.trim() : "";
+  const text = typeof body.text === "string" ? body.text.trim() : "";
+  if (!eventId || !text) {
+    res.status(400).json({ error: "eventId_and_text_required" });
+    return;
+  }
+
+  const notice = await prisma.transparencyUserNotice.findFirst({
+    where: { userId: req.auth!.sub, eventId }
+  });
+  if (!notice) {
+    res.status(403).json({ error: "not_affected_user" });
+    return;
+  }
+
+  try {
+    const auditRes = await auditInternalFetch("/internal/complaints", {
+      method: "POST",
+      body: JSON.stringify({ eventId, userId: req.auth!.sub, body: text })
+    });
+    const payload = await auditRes.json().catch(() => ({}));
+    if (auditRes.status === 409) {
+      res.status(409).json({ error: "duplicate_complaint" });
+      return;
+    }
+    if (!auditRes.ok) {
+      res.status(auditRes.status).json(payload);
+      return;
+    }
+    res.status(201).json(payload);
+  } catch (error) {
+    console.error("[transparency/complaints]", error);
+    res.status(502).json({ error: "audit_service_unavailable" });
+  }
 });
 
 const requireInternalService = (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -1097,57 +1172,23 @@ wss.on("connection", (socket, req) => {
       socket.close();
       return;
     }
-    registerSocket(socket, decoded.sub);
+    const userId = decoded.sub;
+    const wasOnline = isUserConnected(userId);
+    registerSocket(socket, userId);
+    if (!wasOnline) {
+      void notifyPresenceForUser(prisma, userId, "online");
+    }
   } catch {
     socket.close();
     return;
   }
-  socket.on("close", () => unregisterSocket(socket));
-});
-
-app.post("/chats/:chatId/messages", auth, async (req: AuthRequest, res) => {
-  const chatId = req.params.chatId;
-  if (!(await isChatMember(chatId, req.auth!.sub))) {
-    res.status(403).json({ error: "chat access denied" });
-    return;
-  }
-
-  const row = await prisma.message.create({
-    data: {
-      chatId,
-      senderId: req.auth!.sub,
-      cipherText: String(req.body.cipherText ?? ""),
-      kind: String(req.body.kind ?? "text"),
-      mediaId: typeof req.body.mediaId === "string" ? req.body.mediaId : null
-    },
-    include: {
-      sender: {
-        select: {
-          displayName: true
-        }
-      }
+  socket.on("close", () => {
+    const userId = getUserIdForSocket(socket);
+    unregisterSocket(socket);
+    if (userId && !isUserConnected(userId)) {
+      void notifyPresenceForUser(prisma, userId, "offline");
     }
   });
-  const envelope: EncryptedEnvelopeWithSender = {
-    id: row.id,
-    chatId: row.chatId,
-    senderId: row.senderId,
-    cipherText: row.cipherText,
-    sentAt: row.sentAt.toISOString(),
-    kind: row.kind,
-    mediaId: row.mediaId ?? undefined,
-    senderDisplayName: row.sender.displayName
-  };
-
-  const members = await prisma.chatMember.findMany({
-    where: { chatId },
-    select: { userId: true }
-  });
-  broadcastToUsers(
-    members.map((member) => member.userId),
-    { type: "message.created", payload: envelope }
-  );
-  res.status(201).json(envelope);
 });
 
 app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -1190,7 +1231,9 @@ const bootstrap = async () => {
   await prisma.$connect();
   const initialized = await initEncryptionKeys();
   server.listen(port, () => {
-    console.log(`messaging listening on :${port} (keyProvider=${keyProvider}, keysReady=${initialized})`);
+    console.log(
+      `messaging listening on :${port} (keyProvider=${keyProvider}, profile=${instanceConfig.deploymentProfile}, transparency=${instanceConfig.userTransparencyEnabled})`
+    );
   });
 
   if (!initialized) {

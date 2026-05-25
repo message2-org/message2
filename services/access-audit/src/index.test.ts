@@ -1,9 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import jwt from "jsonwebtoken";
+
+process.env.AUDIT_STORE = "memory";
+
 import { createAccessAuditApp } from "./app.js";
 import { config } from "./config.js";
-import { listAuditEvents, resetAuditStoreForTests } from "./store.js";
+import { listAuditEvents, resetAuditStoreForTests } from "./store/index.js";
+import { resetComplaintsForTests } from "./complaints.js";
 
 const adminToken = () =>
   jwt.sign({ sub: "admin-user", role: "admin" }, config.jwtSecret, { expiresIn: "1h" });
@@ -22,6 +26,7 @@ const validPayload = {
 
 test("POST /privileged/operations requires admin and valid body", async (t) => {
   resetAuditStoreForTests();
+  resetComplaintsForTests();
   const app = createAccessAuditApp();
   const server = app.listen(0);
   t.after(() => {
@@ -62,7 +67,84 @@ test("POST /privileged/operations requires admin and valid body", async (t) => {
   assert.equal(ok.status, 201);
   const body = (await ok.json()) as { transparencyEvent: { reasonCode: string; legalRef: string } };
   assert.equal(body.transparencyEvent.reasonCode, "court_order");
-  assert.equal(listAuditEvents().length, 1);
+  assert.equal((await listAuditEvents()).length, 1);
+});
+
+test("POST /internal/privileged/operations requires internal secret", async (t) => {
+  resetAuditStoreForTests();
+  process.env.INTERNAL_SERVICE_SECRET = "test-internal-secret";
+  const app = createAccessAuditApp();
+  const server = app.listen(0);
+  t.after(() => server.close());
+
+  const port = (server.address() as { port: number }).port;
+  const base = `http://127.0.0.1:${port}`;
+
+  const denied = await fetch(`${base}/internal/privileged/operations`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...validPayload, actor: "lawful_api" })
+  });
+  assert.equal(denied.status, 401);
+
+  const ok = await fetch(`${base}/internal/privileged/operations`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-internal-secret": "test-internal-secret"
+    },
+    body: JSON.stringify({
+      ...validPayload,
+      actor: "lawful_api",
+      legalRef: "internal-lawful-ref-001"
+    })
+  });
+  assert.equal(ok.status, 201);
+  const body = (await ok.json()) as { transparencyEvent: { actor: string } };
+  assert.equal(body.transparencyEvent.actor, "lawful_api");
+});
+
+test("complaint flow on memory store", async (t) => {
+  resetAuditStoreForTests();
+  resetComplaintsForTests();
+  process.env.INTERNAL_SERVICE_SECRET = "complaint-flow-secret";
+
+  const app = createAccessAuditApp();
+  const server = app.listen(0);
+  t.after(() => server.close());
+
+  const port = (server.address() as { port: number }).port;
+  const base = `http://127.0.0.1:${port}`;
+
+  const op = await fetch(`${base}/internal/privileged/operations`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-internal-secret": "complaint-flow-secret"
+    },
+    body: JSON.stringify({
+      ...validPayload,
+      actor: "lawful_api",
+      legalRef: "complaint-flow-legal-ref"
+    })
+  });
+  assert.equal(op.status, 201);
+  const opBody = (await op.json()) as { transparencyEvent: { id: string } };
+  const eventId = opBody.transparencyEvent.id;
+
+  const complaint = await fetch(`${base}/internal/complaints`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-internal-secret": "complaint-flow-secret"
+    },
+    body: JSON.stringify({
+      eventId,
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      body: "x".repeat(80)
+    })
+  });
+  assert.equal(complaint.status, 201);
 });
 
 test("POST /privileged/read maps legacy body", async (t) => {

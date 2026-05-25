@@ -4,8 +4,18 @@ import { AuthPage } from "./pages/AuthPage";
 import { ChatPage } from "./pages/ChatPage";
 import { uploadAvatarMediaRef } from "./lib/avatar";
 import { fetchMediaBlobUrl, uploadMediaFile } from "./lib/media";
+import { registerWebPush } from "./lib/push";
 import { useResolvedAvatarUrl } from "./hooks/useResolvedAvatarUrl";
-import { AuthMode, AuthUser, ChatItem, Message, PendingAttachment, TransparencyBanner } from "./types";
+import { TransparencyDetailModal } from "./components/TransparencyDetailModal";
+import {
+  AuthMode,
+  AuthUser,
+  ChatItem,
+  Message,
+  PendingAttachment,
+  TransparencyBanner,
+  TransparencyDetailResponse
+} from "./types";
 
 const API_BASE_URLS = ["/messaging", "http://localhost:4000/messaging", "http://localhost:4001"] as const;
 const USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -26,7 +36,10 @@ type ChatApiResponseItem = {
   id: string;
   title: string;
   kind: "dm" | "group";
-  members: { id: string; displayName: string; username: string }[];
+  members: { id: string; displayName: string; username: string; lastReadAt?: string | null }[];
+  peerUserId?: string;
+  peerStatus?: "online" | "offline";
+  lastDelivery?: "sent" | "read" | null;
   lastMessage: { id: string; senderId: string; cipherText: string; sentAt: string } | null;
 };
 type MessageApiResponseItem = {
@@ -39,6 +52,18 @@ type MessageApiResponseItem = {
   disclosure?: Message["disclosure"];
   isTombstone?: boolean;
   tombstoneLabel?: string;
+  isDeleted?: boolean;
+  editedAt?: string;
+  replyToMessageId?: string;
+  replyTo?: {
+    id: string;
+    senderId: string;
+    cipherText: string;
+    kind: string;
+    senderDisplayName?: string;
+    isDeleted?: boolean;
+  };
+  reactions?: { emoji: string; count: number; userIds: string[]; reactedByMe?: boolean }[];
 };
 type AttachmentPayload = {
   kind: "attachment";
@@ -258,7 +283,54 @@ async function requestMessages(accessToken: string, chatId: string) {
   return (await response.json()) as MessageApiResponseItem[];
 }
 
-async function requestSendMessage(accessToken: string, chatId: string, text: string, mediaId?: string | null) {
+async function requestMarkChatRead(accessToken: string, chatId: string) {
+  await requestWithAuth(`/chats/${chatId}/read`, accessToken, { method: "POST", body: "{}" });
+}
+
+async function requestChatTyping(accessToken: string, chatId: string, typing: boolean) {
+  await requestWithAuth(`/chats/${chatId}/typing`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ typing })
+  });
+}
+
+async function requestEditMessage(accessToken: string, chatId: string, messageId: string, cipherText: string) {
+  const response = await requestWithAuth(`/chats/${chatId}/messages/${messageId}`, accessToken, {
+    method: "PATCH",
+    body: JSON.stringify({ cipherText })
+  });
+  if (!response.ok) throw new Error("edit_failed");
+  return (await response.json()) as MessageApiResponseItem;
+}
+
+async function requestDeleteMessage(accessToken: string, chatId: string, messageId: string) {
+  const response = await requestWithAuth(`/chats/${chatId}/messages/${messageId}`, accessToken, {
+    method: "DELETE"
+  });
+  if (!response.ok) throw new Error("delete_failed");
+  return (await response.json()) as MessageApiResponseItem;
+}
+
+async function requestToggleReaction(accessToken: string, chatId: string, messageId: string, emoji: string) {
+  const response = await requestWithAuth(`/chats/${chatId}/messages/${messageId}/reactions`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify({ emoji })
+  });
+  if (!response.ok) throw new Error("reaction_failed");
+  return (await response.json()) as {
+    chatId: string;
+    messageId: string;
+    reactions: MessageApiResponseItem["reactions"];
+  };
+}
+
+async function requestSendMessage(
+  accessToken: string,
+  chatId: string,
+  text: string,
+  mediaId?: string | null,
+  replyToMessageId?: string | null
+) {
   let kind = "text";
   let bodyText = text;
   let resolvedMediaId = mediaId ?? null;
@@ -280,7 +352,8 @@ async function requestSendMessage(accessToken: string, chatId: string, text: str
     body: JSON.stringify({
       cipherText: bodyText,
       kind,
-      ...(resolvedMediaId ? { mediaId: resolvedMediaId } : {})
+      ...(resolvedMediaId ? { mediaId: resolvedMediaId } : {}),
+      ...(replyToMessageId ? { replyToMessageId } : {})
     })
   });
   return (await response.json()) as MessageApiResponseItem;
@@ -293,6 +366,52 @@ async function requestCreateChat(accessToken: string, payload: { title: string; 
     body: JSON.stringify(payload)
   });
   return (await response.json()) as { id: string };
+}
+
+async function requestTransparencyDetail(accessToken: string, eventId: string) {
+  const response = await requestWithAuth(`/transparency/notices/${encodeURIComponent(eventId)}`, accessToken);
+  if (!response.ok) throw new Error("transparency_detail_failed");
+  return (await response.json()) as TransparencyDetailResponse;
+}
+
+async function requestSubmitComplaint(accessToken: string, eventId: string, text: string) {
+  const response = await requestWithAuth("/transparency/complaints", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ eventId, text })
+  });
+  if (response.ok) return { ok: true as const };
+  if (response.status === 409) return { ok: false as const, error: "duplicate_complaint" };
+  return { ok: false as const, error: "failed" };
+}
+
+type ChatEncryptionState = {
+  effectiveMode: string;
+  pendingRequest: {
+    id: string;
+    requestedMode: string;
+    isPeer: boolean;
+  } | null;
+};
+
+async function requestChatEncryption(accessToken: string, chatId: string) {
+  const response = await requestWithAuth(`/chats/${chatId}/encryption`, accessToken);
+  if (!response.ok) throw new Error("encryption_state_failed");
+  return (await response.json()) as ChatEncryptionState;
+}
+
+async function respondEncryptionDowngrade(
+  accessToken: string,
+  chatId: string,
+  requestId: string,
+  accept: boolean
+) {
+  const response = await requestWithAuth(
+    `/chats/${chatId}/encryption/downgrade/${requestId}/respond`,
+    accessToken,
+    { method: "POST", body: JSON.stringify({ accept }) }
+  );
+  if (!response.ok) throw new Error("encryption_consent_failed");
+  return (await response.json()) as { accepted: boolean; effectiveMode?: string };
 }
 
 async function requestDiscover(accessToken: string, query: string) {
@@ -402,7 +521,17 @@ export default function App() {
   const [isRealtimeReconnecting, setIsRealtimeReconnecting] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [transparencyBanner, setTransparencyBanner] = useState<TransparencyBanner | null>(null);
+  const [transparencyDetailEventId, setTransparencyDetailEventId] = useState<string | null>(null);
+  const [userTransparencyEnabled, setUserTransparencyEnabled] = useState(true);
+  const [chatEncryptionMode, setChatEncryptionMode] = useState<string | null>(null);
+  const [encryptionConsent, setEncryptionConsent] = useState<{
+    requestId: string;
+    requestedMode: string;
+  } | null>(null);
   const wsHasOpenedRef = useRef(false);
+  const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [typingByChat, setTypingByChat] = useState<Record<string, { userId: string; displayName: string }[]>>({});
   const [accountPassword, setAccountPassword] = useState("");
   const [session, setSession] = useState<StoredSession | null>(null);
   const [isRestoringSession, setIsRestoringSession] = useState(true);
@@ -411,6 +540,11 @@ export default function App() {
   const activeChatIdRef = useRef<string | null>(null);
   const localeRef = useRef(locale);
   const authUserRef = useRef(authUser);
+  const userTransparencyEnabledRef = useRef(userTransparencyEnabled);
+
+  useEffect(() => {
+    userTransparencyEnabledRef.current = userTransparencyEnabled;
+  }, [userTransparencyEnabled]);
 
   const toChatItem = (chat: ChatApiResponseItem): ChatItem => {
     const last = chat.lastMessage;
@@ -422,14 +556,15 @@ export default function App() {
       id: chat.id,
       group: "regular",
       kind: chat.kind,
+      peerUserId: chat.peerUserId ?? peer?.id,
       peerUsername: peer?.username,
       name: chatName,
-      status: "offline",
+      status: chat.peerStatus === "online" ? "online" : "offline",
       lastMessage: last?.cipherText ?? "",
       lastSenderType: last ? senderType : undefined,
       lastSenderName: senderType === "me" ? (locale === "ru" ? "Вы" : "You") : undefined,
       lastAt: last?.sentAt,
-      lastDelivery: senderType === "me" ? "sent" : null,
+      lastDelivery: chat.lastDelivery ?? (senderType === "me" ? "sent" : null),
       unread: 0
     };
   };
@@ -481,18 +616,57 @@ export default function App() {
       };
     }
 
+    const deletedLabel = locale === "ru" ? "Сообщение удалено" : "Message deleted";
+    const timeBase = new Date(createdAt).toLocaleTimeString(locale === "ru" ? "ru-RU" : "en-US", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    const timeLabel = message.editedAt
+      ? `${timeBase} · ${locale === "ru" ? "изм." : "edited"}`
+      : timeBase;
+
+    const replyAuthor =
+      message.replyTo?.senderId === authUser?.id
+        ? locale === "ru"
+          ? "Вы"
+          : "You"
+        : (message.replyTo?.senderDisplayName ??
+          message.senderDisplayName ??
+          (locale === "ru" ? "Собеседник" : "Contact"));
+
     return {
       id: message.id,
       sender: message.senderId === authUser?.id ? "me" : "them",
       author: message.senderId === authUser?.id ? authUser?.displayName ?? (locale === "ru" ? "Вы" : "You") : message.senderDisplayName ?? (locale === "ru" ? "Собеседник" : "Contact"),
-      text: parsedAttachment?.text ?? message.cipherText,
-      time: new Date(createdAt).toLocaleTimeString(locale === "ru" ? "ru-RU" : "en-US", { hour: "2-digit", minute: "2-digit" }),
+      text: message.isDeleted ? deletedLabel : (parsedAttachment?.text ?? message.cipherText),
+      time: timeLabel,
       createdAt,
-      mediaId: parsedAttachment?.mediaId,
-      preview: parsedAttachment?.preview,
-      previewType: parsedAttachment?.previewType,
+      mediaId: message.isDeleted ? undefined : parsedAttachment?.mediaId,
+      preview: message.isDeleted ? undefined : parsedAttachment?.preview,
+      previewType: message.isDeleted ? undefined : parsedAttachment?.previewType,
       fileName: parsedAttachment?.fileName,
-      disclosure: message.disclosure
+      disclosure: message.disclosure,
+      isDeleted: message.isDeleted,
+      editedAt: message.editedAt,
+      ...(message.replyTo
+        ? {
+            replyTo: {
+              id: message.replyTo.id,
+              author: replyAuthor,
+              text: message.replyTo.isDeleted ? deletedLabel : message.replyTo.cipherText,
+              isDeleted: message.replyTo.isDeleted
+            }
+          }
+        : {}),
+      ...(message.reactions?.length
+        ? {
+            reactions: message.reactions.map((r) => ({
+              emoji: r.emoji,
+              count: r.count,
+              reactedByMe: r.reactedByMe
+            }))
+          }
+        : {})
     };
   };
 
@@ -551,7 +725,14 @@ export default function App() {
 
   useEffect(() => {
     activeChatIdRef.current = activeChatId;
+    setReplyTo(null);
+    setTypingByChat((prev) => (activeChatId ? { ...prev, [activeChatId]: [] } : prev));
   }, [activeChatId]);
+
+  useEffect(() => {
+    if (!activeChatId || !session?.accessToken) return;
+    void runAuthorized((accessToken) => requestMarkChatRead(accessToken, activeChatId)).catch(() => {});
+  }, [activeChatId, session?.accessToken]);
 
   useEffect(() => {
     localeRef.current = locale;
@@ -601,6 +782,29 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadProfile = async () => {
+      for (const base of API_BASE_URLS) {
+        try {
+          const response = await fetch(`${base}/instance/profile`);
+          if (!response.ok) continue;
+          const body = (await response.json()) as { userTransparencyEnabled?: boolean };
+          if (!cancelled) {
+            setUserTransparencyEnabled(body.userTransparencyEnabled !== false);
+          }
+          return;
+        } catch {
+          /* try next base */
+        }
+      }
+    };
+    void loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function resetValidationState() {
     setSubmitAttempted(false);
     setFieldTyped({ displayName: false, username: false, password: false, confirmPassword: false });
@@ -629,6 +833,25 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (!session?.accessToken) return;
+    void registerWebPush(session.accessToken).catch(() => {});
+  }, [session?.accessToken]);
+
+  useEffect(() => {
+    if (!authUser || !session || chats.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const chatFromUrl = params.get("chat");
+    if (!chatFromUrl) return;
+    const exists = chats.some((chat) => chat.id === chatFromUrl);
+    if (!exists) return;
+    setActiveChatId(chatFromUrl);
+    loadMessagesForChat(chatFromUrl);
+    params.delete("chat");
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
+    window.history.replaceState({}, "", next);
+  }, [authUser?.id, session?.accessToken, chats.length]);
+
+  useEffect(() => {
     if (!authUser || !session) return;
     let cancelled = false;
     void runAuthorized(requestChats)
@@ -651,6 +874,35 @@ export default function App() {
     if (!activeChatId) return;
     void loadMessagesForChat(activeChatId);
   }, [activeChatId]);
+
+  const refreshChatEncryption = (chatId: string) => {
+    if (!session) return;
+    void runAuthorized((token) => requestChatEncryption(token, chatId))
+      .then((state) => {
+        setChatEncryptionMode(state.effectiveMode);
+        if (state.pendingRequest?.isPeer) {
+          setEncryptionConsent({
+            requestId: state.pendingRequest.id,
+            requestedMode: state.pendingRequest.requestedMode
+          });
+        } else {
+          setEncryptionConsent(null);
+        }
+      })
+      .catch(() => {
+        setChatEncryptionMode(null);
+        setEncryptionConsent(null);
+      });
+  };
+
+  useEffect(() => {
+    if (!activeChatId || !session) {
+      setChatEncryptionMode(null);
+      setEncryptionConsent(null);
+      return;
+    }
+    refreshChatEncryption(activeChatId);
+  }, [activeChatId, session]);
 
   useEffect(() => {
     if (!authUser || !session) return;
@@ -804,7 +1056,20 @@ export default function App() {
           };
           if (!parsed.type || !parsed.payload) return;
 
+          if (
+            parsed.type === "encryption.downgrade.request" ||
+            parsed.type === "encryption.mode.changed" ||
+            parsed.type === "encryption.downgrade.rejected"
+          ) {
+            const chatId = parsed.payload.chatId;
+            if (typeof chatId === "string" && chatId === activeChatIdRef.current) {
+              refreshChatEncryption(chatId);
+            }
+            return;
+          }
+
           if (parsed.type === "transparency.notice") {
+            if (!userTransparencyEnabledRef.current) return;
             const payload = parsed.payload;
             if (!payload.eventId || !payload.summary) return;
             setTransparencyBanner({
@@ -867,6 +1132,97 @@ export default function App() {
               const rows = prev[payload.chatId!] ?? [];
               const without = rows.filter((row) => row.id !== payload.messageId);
               return { ...prev, [payload.chatId!]: [...without, tombUi] };
+            });
+            return;
+          }
+
+          if (parsed.type === "presence.changed") {
+            const payload = parsed.payload;
+            if (!payload.userId || (payload.status !== "online" && payload.status !== "offline")) return;
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.kind === "dm" && chat.peerUserId === payload.userId
+                  ? { ...chat, status: payload.status === "online" ? "online" : "offline" }
+                  : chat
+              )
+            );
+            return;
+          }
+
+          if (parsed.type === "chat.typing") {
+            const payload = parsed.payload;
+            if (!payload.chatId || !payload.userId) return;
+            setTypingByChat((prev) => {
+              const list = prev[payload.chatId!] ?? [];
+              if (!payload.typing) {
+                return { ...prev, [payload.chatId!]: list.filter((u) => u.userId !== payload.userId) };
+              }
+              if (list.some((u) => u.userId === payload.userId)) return prev;
+              return {
+                ...prev,
+                [payload.chatId!]: [
+                  ...list,
+                  { userId: payload.userId!, displayName: payload.displayName ?? "" }
+                ]
+              };
+            });
+            return;
+          }
+
+          if (parsed.type === "chat.read") {
+            const payload = parsed.payload;
+            if (!payload.chatId || !payload.userId) return;
+            const currentUserId = authUserRef.current?.id;
+            if (payload.userId === currentUserId) return;
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === payload.chatId && chat.lastSenderType === "me"
+                  ? { ...chat, lastDelivery: "read" as const }
+                  : chat
+              )
+            );
+            return;
+          }
+
+          if (parsed.type === "message.updated" || parsed.type === "message.deleted") {
+            const payload = parsed.payload as MessageApiResponseItem;
+            if (!payload.chatId) return;
+            const uiMessage = toUiMessage(payload);
+            setMessagesByChat((prev) => {
+              const rows = prev[payload.chatId] ?? [];
+              return {
+                ...prev,
+                [payload.chatId]: rows.map((row) => (row.id === uiMessage.id ? uiMessage : row))
+              };
+            });
+            return;
+          }
+
+          if (parsed.type === "message.reactions") {
+            const payload = parsed.payload as {
+              chatId?: string;
+              messageId?: string;
+              reactions?: MessageApiResponseItem["reactions"];
+            };
+            if (!payload.chatId || !payload.messageId) return;
+            const currentUserId = authUserRef.current?.id;
+            setMessagesByChat((prev) => {
+              const rows = prev[payload.chatId!] ?? [];
+              return {
+                ...prev,
+                [payload.chatId!]: rows.map((row) =>
+                  row.id === payload.messageId
+                    ? {
+                        ...row,
+                        reactions: (payload.reactions ?? []).map((r) => ({
+                          emoji: r.emoji,
+                          count: r.count,
+                          reactedByMe: currentUserId ? r.userIds?.includes(currentUserId) : false
+                        }))
+                      }
+                    : row
+                )
+              };
             });
             return;
           }
@@ -1122,6 +1478,18 @@ export default function App() {
   }
 
   return (
+    <>
+    {transparencyDetailEventId ? (
+      <TransparencyDetailModal
+        locale={locale}
+        eventId={transparencyDetailEventId}
+        onClose={() => setTransparencyDetailEventId(null)}
+        loadDetail={(eventId) => runAuthorized((token) => requestTransparencyDetail(token, eventId))}
+        submitComplaint={(eventId, text) =>
+          runAuthorized((token) => requestSubmitComplaint(token, eventId, text))
+        }
+      />
+    ) : null}
     <ChatPage
       locale={locale}
       theme={theme}
@@ -1131,8 +1499,17 @@ export default function App() {
       isMenuOpen={isMenuOpen}
       isRealtimeReconnecting={isRealtimeReconnecting}
       isRealtimeConnected={isRealtimeConnected}
-      transparencyBanner={transparencyBanner}
+      transparencyBanner={userTransparencyEnabled ? transparencyBanner : null}
       onDismissTransparency={() => setTransparencyBanner(null)}
+      onOpenTransparency={(eventId) => setTransparencyDetailEventId(eventId)}
+      chatEncryptionMode={chatEncryptionMode}
+      encryptionConsent={encryptionConsent}
+      onEncryptionConsent={(accept) => {
+        if (!activeChatId || !encryptionConsent || !session) return;
+        void runAuthorized((token) =>
+          respondEncryptionDowngrade(token, activeChatId, encryptionConsent.requestId, accept)
+        ).then(() => refreshChatEncryption(activeChatId));
+      }}
       search={search}
       discoverUsers={discoverUsers}
       discoverJoinedChannels={discoverJoinedChannels}
@@ -1173,7 +1550,55 @@ export default function App() {
         }
       }}
       onSearchChange={setSearch}
-      onInputChange={setInput}
+      replyTo={replyTo}
+      onCancelReply={() => setReplyTo(null)}
+      onSetReplyTo={setReplyTo}
+      typingPeers={activeChatId ? (typingByChat[activeChatId] ?? []) : []}
+      onInputChange={(value) => {
+        setInput(value);
+        if (!activeChatId || !value.trim()) return;
+        if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+        void runAuthorized((accessToken) => requestChatTyping(accessToken, activeChatId, true)).catch(() => {});
+        typingStopTimerRef.current = setTimeout(() => {
+          void runAuthorized((accessToken) => requestChatTyping(accessToken, activeChatId, false)).catch(() => {});
+        }, 2500);
+      }}
+      onEditMessage={async (chatId, messageId, cipherText) => {
+        const updated = await runAuthorized((accessToken) => requestEditMessage(accessToken, chatId, messageId, cipherText));
+        const uiMessage = toUiMessage(updated);
+        setMessagesByChat((prev) => ({
+          ...prev,
+          [chatId]: (prev[chatId] ?? []).map((row) => (row.id === uiMessage.id ? uiMessage : row))
+        }));
+      }}
+      onDeleteMessage={async (chatId, messageId) => {
+        const updated = await runAuthorized((accessToken) => requestDeleteMessage(accessToken, chatId, messageId));
+        const uiMessage = toUiMessage(updated);
+        setMessagesByChat((prev) => ({
+          ...prev,
+          [chatId]: (prev[chatId] ?? []).map((row) => (row.id === uiMessage.id ? uiMessage : row))
+        }));
+      }}
+      onToggleReaction={async (chatId, messageId, emoji) => {
+        const result = await runAuthorized((accessToken) =>
+          requestToggleReaction(accessToken, chatId, messageId, emoji)
+        );
+        setMessagesByChat((prev) => ({
+          ...prev,
+          [chatId]: (prev[chatId] ?? []).map((row) =>
+            row.id === messageId
+              ? {
+                  ...row,
+                  reactions: (result.reactions ?? []).map((r) => ({
+                    emoji: r.emoji,
+                    count: r.count,
+                    reactedByMe: r.userIds?.includes(authUser.id)
+                  }))
+                }
+              : row
+          )
+        }));
+      }}
       onPrepareAttachment={async (file) => {
         const type: PendingAttachment["type"] = file.type.startsWith("video/")
           ? "video"
@@ -1205,6 +1630,7 @@ export default function App() {
             } satisfies AttachmentPayload)
           : messageText;
         const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const replySnapshot = replyTo;
         const optimisticMessage: Message = {
           id: optimisticId,
           sender: "me",
@@ -1215,10 +1641,21 @@ export default function App() {
           mediaId: attachment?.mediaId,
           preview: attachment?.localPreview,
           previewType: attachment?.type,
-          fileName: attachment?.name
+          fileName: attachment?.name,
+          ...(replySnapshot
+            ? {
+                replyTo: {
+                  id: replySnapshot.id,
+                  author: replySnapshot.author,
+                  text: replySnapshot.text,
+                  isDeleted: replySnapshot.isDeleted
+                }
+              }
+            : {})
         };
         const attachmentPreviewUrl = attachment?.localPreview;
         setInput("");
+        setReplyTo(null);
         setMessagesByChat((prev) => ({
           ...prev,
           [activeChatId]: [...(prev[activeChatId] ?? []), optimisticMessage]
@@ -1226,7 +1663,15 @@ export default function App() {
         if (attachment) {
           URL.revokeObjectURL(attachment.localPreview);
         }
-        void runAuthorized((accessToken) => requestSendMessage(accessToken, activeChatId, wireText, attachment?.mediaId ?? null))
+        void runAuthorized((accessToken) =>
+          requestSendMessage(
+            accessToken,
+            activeChatId,
+            wireText,
+            attachment?.mediaId ?? null,
+            replySnapshot?.id ?? null
+          )
+        )
           .then((created) => {
             const uiMessage = toUiMessage(created);
             if (attachment && attachmentPreviewUrl) {
@@ -1403,5 +1848,6 @@ export default function App() {
         );
       }}
     />
+    </>
   );
 }

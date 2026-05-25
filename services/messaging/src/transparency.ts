@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import type { DisclosureLevel, PrivilegedAction, PrivilegedScope, TransparencyEventV1 } from "@message2/contracts";
 import { broadcastToUsers } from "./realtime.js";
+import { instanceConfig } from "./instance-config.js";
 
 export type TransparencyIngressPayload = Pick<
   TransparencyEventV1,
@@ -60,8 +61,9 @@ export const resolveAffectedUserIds = async (prisma: PrismaClient, scope: Privil
 export const applyTransparencyEvent = async (prisma: PrismaClient, payload: TransparencyIngressPayload) => {
   const affectedUserIds = await resolveAffectedUserIds(prisma, payload.scope);
   const summary = summaryForNotice(payload);
+  const notifyUsers = instanceConfig.userTransparencyEnabled;
 
-  if (affectedUserIds.size) {
+  if (notifyUsers && affectedUserIds.size) {
     await prisma.transparencyUserNotice.createMany({
       data: [...affectedUserIds].map((userId) => ({
         id: randomUUID(),
@@ -143,9 +145,12 @@ export const applyTransparencyEvent = async (prisma: PrismaClient, payload: Tran
     createdAt: payload.createdAt
   };
 
-  broadcastToUsers(affectedUserIds, { type: "transparency.notice", payload: noticePayload });
+  if (notifyUsers) {
+    broadcastToUsers(affectedUserIds, { type: "transparency.notice", payload: noticePayload });
+  }
 
   for (const disclosure of disclosures) {
+    if (!notifyUsers) continue;
     broadcastToUsers(affectedUserIds, {
       type: "message.disclosure",
       payload: {
@@ -156,7 +161,7 @@ export const applyTransparencyEvent = async (prisma: PrismaClient, payload: Tran
   }
 
   for (const messageId of messageIds) {
-    if (payload.action !== "message_delete") continue;
+    if (!notifyUsers || payload.action !== "message_delete") continue;
     const tomb = await prisma.messageTombstone.findFirst({ where: { messageId, eventId: payload.id } });
     if (!tomb) continue;
     broadcastToUsers(affectedUserIds, {

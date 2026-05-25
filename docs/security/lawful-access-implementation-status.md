@@ -114,7 +114,7 @@ Last updated: **2026-05-25** (P1–P3 done; handoff for new agents)
 
 | Item | Status | Notes |
 |------|--------|-------|
-| External lawful API disabled | 📄 | Policy only; no runtime guard yet |
+| External lawful API disabled (corporate) | ✅ | `readInstanceProfileFromEnv`; gateway `/lawful` 404 on corporate |
 | Admin-configurable encryption (no forced max) | 📄 | `deployment-profiles.md` |
 | Connectivity: `isolated` / `federation` / `public_bridge` | 📄 | No code |
 | Federation between corporate servers | ⬜ | |
@@ -123,16 +123,14 @@ Last updated: **2026-05-25** (P1–P3 done; handoff for new agents)
 
 ## Planned next (for new agents — 2026-05-25)
 
-Lawful access **P0–P6** is complete. Default product work:
+Lawful access **P0–P6** and Track B web v1 + push are complete. Default product work:
 
 | Priority | Track | Task |
 |----------|-------|------|
-| 1 | B | Web messenger v1 + **real push** (FCM/Web Push) |
-| 2 | D | Android client (`apps/android`) after web + push stable |
-| 3 | D | Desktop via Tauri (Linux/Windows/macOS) — see `docs/product/client-platform-roadmap.md` |
+| 1 | D | Android client (`apps/android`) — FCM register, auth, chats |
+| 2 | B | Web polish (session restore, media UX, profile auth per deployment) |
+| 3 | D | Desktop via Tauri — see `docs/product/client-platform-roadmap.md` |
 | alt | C | E2EE / media client encryption |
-
-**Develop commits (local, may need push):** `ab86195` docs → `e758c76` P1 → `25f178d` messaging P2 → `9973eeb` web P2.
 
 ---
 
@@ -143,7 +141,7 @@ Lawful access **P0–P6** is complete. Default product work:
 | Monorepo layout | AGENTS / ai-context | Matches `apps/web`, `services/*`, `packages/contracts` | ✅ |
 | Lawful access P1–P2 | spec | Implemented (see phases above) | ✅ |
 | Lawful access P3 | spec | `lawful-access` + gateway `/lawful` | ✅ |
-| Lawful access P4–P6 | spec | Not started | ⬜ planned |
+| Lawful access P4–P6 | spec | complaints, encryption, SIEM, `apps/admin` | ✅ |
 | `DEPLOYMENT_PROFILE` | deployment-profiles | contracts helper + all services | ✅ |
 | E2EE | e2ee-design, README | `cipherText` JSON/plain; no Double Ratchet | ⬜ |
 | Argon2id | deployment-profiles | Implemented in messaging | ✅ (README was stale; fixed) |
@@ -163,6 +161,8 @@ Lawful access **P0–P6** is complete. Default product work:
 
 | Date | Change |
 |------|--------|
+| 2026-05-25 | Track B push: `notifications` Web Push/FCM, messaging `notifyMessagePush`, web `sw.js` |
+| 2026-05-25 | Track B messenger: message actions, read/typing/presence, message migrations |
 | 2026-05-25 | Multi-agent: `docs/ops/agent-coordination.md`, claims in ai-context §4, `.cursor/rules/agent-coordination.mdc` |
 | 2026-05-25 | Added `docs/product/client-platform-roadmap.md` (web → push → Android → desktop → iOS) |
 | 2026-05-25 | **P6 implemented:** SIEM NDJSON/CEF export, webhook forward, compliance runbooks |

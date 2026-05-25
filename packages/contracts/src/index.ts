@@ -8,7 +8,15 @@ export interface EncryptedEnvelope {
   sentAt: string;
   kind: MessageKind;
   mediaId?: string;
+  editedAt?: string;
+  deletedAt?: string;
+  isDeleted?: boolean;
+  replyToMessageId?: string;
+  replyTo?: import("./message.js").MessageReplyPreview;
+  reactions?: import("./message.js").MessageReactionSummary[];
 }
+
+export type { MessageReactionSummary, MessageReplyPreview, EncryptedEnvelopeV1 } from "./message.js";
 
 export type { TransparencyEvent } from "./lawful.js";
 
@@ -37,3 +45,41 @@ export {
   type ValidationError,
   type ValidatePrivilegedOptions
 } from "./lawful-validation.js";
+
+export { lawfulApiBodyToOperation } from "./lawful-api-mapper.js";
+
+export {
+  COMPLAINT_STATUSES,
+  MIN_COMPLAINT_BODY_LENGTH,
+  type ComplaintCreateInput,
+  type ComplaintRecord,
+  type ComplaintStatus
+} from "./complaint.js";
+
+export {
+  CORPORATE_CONNECTIVITY_MODES,
+  isUserTransparencyEnabled,
+  parseCorporateConnectivityMode,
+  parseDeploymentProfile,
+  readInstanceProfileFromEnv,
+  resolveLawfulAccessEnabled,
+  type CorporateConnectivityMode,
+  type InstanceProfileSnapshot
+} from "./deployment-profile.js";
+
+export type { FcmRegisterInput, PushMessageDispatch, WebPushSubscriptionInput } from "./push.js";
+
+export {
+  ENCRYPTION_MODES,
+  ENCRYPTION_MODE_STRENGTH,
+  clampEncryptionMode,
+  defaultInstanceEncryptionPolicy,
+  encryptionModeStrength,
+  isEncryptionDowngrade,
+  isEncryptionMode,
+  isWithinEncryptionBounds,
+  resolveEffectiveEncryptionMode,
+  isValidInstancePolicyShape,
+  type EncryptionMode,
+  type InstanceEncryptionPolicy
+} from "./encryption.js";

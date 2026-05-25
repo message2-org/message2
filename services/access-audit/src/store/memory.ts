@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { PrivilegedOperationRequest, TransparencyEventV1 } from "@message2/contracts";
 import type { DeploymentProfile } from "@message2/contracts";
+import { DuplicateLegalRefError } from "./errors.js";
 
 const events: TransparencyEventV1[] = [];
 
@@ -8,6 +9,9 @@ export const appendTransparencyEvent = (
   request: PrivilegedOperationRequest,
   deploymentProfile: DeploymentProfile
 ): TransparencyEventV1 => {
+  if (events.some((event) => event.legalRef === request.legalRef)) {
+    throw new DuplicateLegalRefError(request.legalRef);
+  }
   const event: TransparencyEventV1 = {
     id: randomUUID(),
     deploymentProfile,
@@ -27,6 +31,9 @@ export const appendTransparencyEvent = (
 };
 
 export const listAuditEvents = (): TransparencyEventV1[] => [...events];
+
+export const findAuditEventById = (eventId: string): TransparencyEventV1 | null =>
+  events.find((event) => event.id === eventId) ?? null;
 
 export const resetAuditStoreForTests = () => {
   events.length = 0;

@@ -60,12 +60,17 @@ services:
         condition: service_healthy
       access-audit:
         condition: service_healthy
+      lawful-access:
+        condition: service_healthy
     environment:
       PORT: "4000"
+      DEPLOYMENT_PROFILE: ${MESSAGE2_DEPLOYMENT_PROFILE:-public}
+      LAWFUL_ACCESS_ENABLED: ${MESSAGE2_LAWFUL_ACCESS_ENABLED:-true}
       MESSAGING_URL: http://messaging:4001
       MEDIA_URL: http://media:4002
       NOTIFICATIONS_URL: http://notifications:4003
       AUDIT_URL: http://access-audit:4004
+      LAWFUL_URL: http://lawful-access:4005
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/health >/dev/null || exit 1"]
       interval: 15s
@@ -98,6 +103,14 @@ services:
       ONBOARDING_WELCOME_TEXT: ${MESSAGE2_ONBOARDING_WELCOME_TEXT:-Добро пожаловать в Послание 2! Здесь можно быстро начать общение и проверить, что всё работает.}
       ONBOARDING_WELCOME_TEXT_RU: ${MESSAGE2_ONBOARDING_WELCOME_TEXT_RU:-Добро пожаловать в Послание 2! Здесь можно быстро начать общение и проверить, что всё работает.}
       ONBOARDING_WELCOME_TEXT_EN: ${MESSAGE2_ONBOARDING_WELCOME_TEXT_EN:-Welcome to Message 2! This chat helps you get started and verify everything works.}
+      DEPLOYMENT_PROFILE: ${MESSAGE2_DEPLOYMENT_PROFILE:-public}
+      LAWFUL_ACCESS_ENABLED: ${MESSAGE2_LAWFUL_ACCESS_ENABLED:-true}
+      CORPORATE_CONNECTIVITY_MODE: ${MESSAGE2_CORPORATE_CONNECTIVITY_MODE:-isolated}
+      INTERNAL_SERVICE_SECRET: ${MESSAGE2_INTERNAL_SERVICE_SECRET:-change-me-internal}
+      NOTIFICATIONS_URL: http://notifications:4003
+      ACCESS_AUDIT_URL: http://access-audit:4004
+      INTERNAL_SERVICE_SECRET: ${MESSAGE2_INTERNAL_SERVICE_SECRET:-change-me-internal}
+      ACCESS_AUDIT_URL: http://access-audit:4004
     ports:
       - "4001:4001"
     healthcheck:
@@ -138,9 +151,18 @@ services:
     working_dir: /app
     volumes:
       - ../..:/app
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/notifications dev"
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/notifications exec prisma generate && pnpm --filter @message2/notifications dev"
     environment:
       PORT: "4003"
+      JWT_SECRET: ${MESSAGE2_JWT_SECRET:-change-me-in-production}
+      INTERNAL_SERVICE_SECRET: ${MESSAGE2_INTERNAL_SERVICE_SECRET:-change-me-internal}
+      DATABASE_URL: postgresql://message2:message2@postgres:5432/message2
+      PUSH_STORE: postgres
+      PUSH_DRY_RUN: ${MESSAGE2_PUSH_DRY_RUN:-true}
+      VAPID_PUBLIC_KEY: ${MESSAGE2_VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${MESSAGE2_VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${MESSAGE2_VAPID_SUBJECT:-mailto:admin@localhost}
+      FCM_LEGACY_SERVER_KEY: ${MESSAGE2_FCM_LEGACY_SERVER_KEY:-}
     ports:
       - "4003:4003"
     healthcheck:
@@ -155,14 +177,48 @@ services:
     working_dir: /app
     volumes:
       - ../..:/app
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/access-audit dev"
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/access-audit exec prisma generate && pnpm --filter @message2/access-audit dev"
     environment:
       PORT: "4004"
+      DEPLOYMENT_PROFILE: ${MESSAGE2_DEPLOYMENT_PROFILE:-public}
+      LAWFUL_ACCESS_ENABLED: ${MESSAGE2_LAWFUL_ACCESS_ENABLED:-true}
       JWT_SECRET: ${MESSAGE2_JWT_SECRET:-change-me-in-production}
+      INTERNAL_SERVICE_SECRET: ${MESSAGE2_INTERNAL_SERVICE_SECRET:-change-me-internal}
+      DATABASE_URL: postgresql://message2:message2@postgres:5432/message2
+      AUDIT_STORE: postgres
+      MESSAGING_URL: http://messaging:4001
+      ACCESS_AUDIT_URL: http://access-audit:4004
+      NOTIFICATIONS_URL: http://notifications:4003
     ports:
       - "4004:4004"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4004/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  lawful-access:
+    image: node:22
+    working_dir: /app
+    volumes:
+      - ../..:/app
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/lawful-access dev"
+    depends_on:
+      access-audit:
+        condition: service_healthy
+    environment:
+      PORT: "4005"
+      DEPLOYMENT_PROFILE: ${MESSAGE2_DEPLOYMENT_PROFILE:-public}
+      LAWFUL_ACCESS_ENABLED: ${MESSAGE2_LAWFUL_ACCESS_ENABLED:-true}
+      ACCESS_AUDIT_URL: http://access-audit:4004
+      INTERNAL_SERVICE_SECRET: ${MESSAGE2_INTERNAL_SERVICE_SECRET:-change-me-internal}
+      LAWFUL_MTLS_REQUIRED: ${MESSAGE2_LAWFUL_MTLS_REQUIRED:-false}
+      LAWFUL_API_SHARED_SECRET: ${MESSAGE2_LAWFUL_API_SHARED_SECRET:-change-me-lawful-api}
+    ports:
+      - "4005:4005"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4005/health >/dev/null || exit 1"]
       interval: 15s
       timeout: 3s
       retries: 5

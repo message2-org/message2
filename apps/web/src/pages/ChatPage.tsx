@@ -56,6 +56,10 @@ type ChatPageProps = {
   isRealtimeConnected: boolean;
   transparencyBanner: TransparencyBanner | null;
   onDismissTransparency: () => void;
+  onOpenTransparency: (eventId: string) => void;
+  chatEncryptionMode: string | null;
+  encryptionConsent: { requestId: string; requestedMode: string } | null;
+  onEncryptionConsent: (accept: boolean) => void;
   search: string;
   discoverUsers: { id: string; username: string; displayName: string }[];
   discoverJoinedChannels: { id: string; name: string; subscribers: number }[];
@@ -69,9 +73,16 @@ type ChatPageProps = {
   onSelectChat: (id: string) => void;
   onOpenDirectChat: (user: { id: string; username: string; displayName: string }) => void | Promise<void>;
   onSearchChange: (value: string) => void;
+  replyTo: Message | null;
+  onCancelReply: () => void;
+  onSetReplyTo: (message: Message | null) => void;
+  typingPeers: { userId: string; displayName: string }[];
   onInputChange: (value: string) => void;
   onPrepareAttachment: (file: File) => Promise<PendingAttachment>;
   onSendMessage: (attachment?: PendingAttachment) => void;
+  onEditMessage: (chatId: string, messageId: string, cipherText: string) => void | Promise<void>;
+  onDeleteMessage: (chatId: string, messageId: string) => void | Promise<void>;
+  onToggleReaction: (chatId: string, messageId: string, emoji: string) => void | Promise<void>;
   onLogout: () => void;
   onThemeToggle: () => void;
   onLocaleSelect: (next: Locale) => void;
@@ -99,6 +110,10 @@ export function ChatPage(props: ChatPageProps) {
     isRealtimeConnected,
     transparencyBanner,
     onDismissTransparency,
+    onOpenTransparency,
+    chatEncryptionMode,
+    encryptionConsent,
+    onEncryptionConsent,
     search,
     discoverUsers,
     discoverJoinedChannels,
@@ -112,9 +127,16 @@ export function ChatPage(props: ChatPageProps) {
     onSelectChat,
     onOpenDirectChat,
     onSearchChange,
+    replyTo,
+    onCancelReply,
+    onSetReplyTo,
+    typingPeers,
     onInputChange,
     onPrepareAttachment,
     onSendMessage,
+    onEditMessage,
+    onDeleteMessage,
+    onToggleReaction,
     onLogout,
     onThemeToggle,
     onLocaleSelect,
@@ -171,6 +193,7 @@ export function ChatPage(props: ChatPageProps) {
   const [isNewChatMenuOpen, setIsNewChatMenuOpen] = useState(false);
   const [isDiscoveryOpen, setIsDiscoveryOpen] = useState(false);
   const [discoveryTab, setDiscoveryTab] = useState<DiscoveryTabId>("chats");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const chatMenuRef = useRef<HTMLDivElement | null>(null);
   const archiveMenuRef = useRef<HTMLDivElement | null>(null);
   const newChatMenuRef = useRef<HTMLDivElement | null>(null);
@@ -421,6 +444,17 @@ export function ChatPage(props: ChatPageProps) {
   }
   function submitComposerMessage() {
     if (!input.trim() && !pendingAttachment) return;
+    if (editingMessageId && activeChatId) {
+      void onEditMessage(activeChatId, editingMessageId, input.trim());
+      setEditingMessageId(null);
+      onInputChange("");
+      clearPendingAttachment();
+      requestAnimationFrame(() => {
+        if (!composerInputRef.current) return;
+        composerInputRef.current.style.height = "0px";
+      });
+      return;
+    }
     onSendMessage(pendingAttachment ?? undefined);
     clearPendingAttachment();
     requestAnimationFrame(() => {
@@ -623,6 +657,10 @@ export function ChatPage(props: ChatPageProps) {
     return "";
   }
   function chatSubtitle(chat: ChatItem | null) {
+    if (typingPeers.length > 0) {
+      const name = typingPeers[0]?.displayName || (locale === "ru" ? "Собеседник" : "Contact");
+      return locale === "ru" ? `${name} печатает…` : `${name} is typing…`;
+    }
     if (!chat) return "";
     if (chat.kind === "group") return locale === "ru" ? "7 участников" : "7 participants";
     return chat.status === "online" ? t.online : t.lastSeen;
@@ -1195,6 +1233,11 @@ export function ChatPage(props: ChatPageProps) {
               <div className="chat-panel__headline">
                 <h2>{activeChat.name}</h2>
                 <p>{chatSubtitle(activeChat)}</p>
+                {chatEncryptionMode ? (
+                  <p className="chat-panel__encryption-mode">
+                    {locale === "ru" ? "Шифрование:" : "Encryption:"} {chatEncryptionMode}
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="chat-panel__actions">
@@ -1229,12 +1272,37 @@ export function ChatPage(props: ChatPageProps) {
           </header>
         ) : null}
 
+        {encryptionConsent ? (
+          <div className="encryption-consent-banner" role="status">
+            <p>
+              {locale === "ru"
+                ? `Запрос на ослабление шифрования до «${encryptionConsent.requestedMode}». Подтвердите, если согласны.`
+                : `Peer requests weaker encryption (${encryptionConsent.requestedMode}). Accept?`}
+            </p>
+            <div className="encryption-consent-banner__actions">
+              <button type="button" onClick={() => onEncryptionConsent(true)}>
+                {locale === "ru" ? "Принять" : "Accept"}
+              </button>
+              <button type="button" onClick={() => onEncryptionConsent(false)}>
+                {locale === "ru" ? "Отклонить" : "Reject"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {transparencyBanner ? (
           <div className="transparency-banner" role="status">
             <span className="transparency-banner__icon" title={locale === "ru" ? "Служебный доступ" : "Privileged access"} aria-hidden="true">
               🕶️
             </span>
             <p className="transparency-banner__text">{transparencyBanner.summary}</p>
+            <button
+              type="button"
+              className="transparency-banner__open"
+              onClick={() => onOpenTransparency(transparencyBanner.eventId)}
+            >
+              {locale === "ru" ? "Подробнее" : "Details"}
+            </button>
             <button type="button" className="transparency-banner__close" onClick={onDismissTransparency} aria-label={locale === "ru" ? "Закрыть" : "Dismiss"}>
               ×
             </button>
@@ -1277,17 +1345,73 @@ export function ChatPage(props: ChatPageProps) {
                     <img src={message.preview} alt="media preview" className="message__preview" />
                   )
                 ) : null;
+                const canInteract = !message.isTombstone && !message.isDeleted && activeChatId;
+                const reactionRow = message.reactions?.length ? (
+                  <div className="message__reactions">
+                    {message.reactions.map((reaction) => (
+                      <button
+                        key={reaction.emoji}
+                        type="button"
+                        className={`message__reaction ${reaction.reactedByMe ? "message__reaction--mine" : ""}`}
+                        onClick={() => canInteract && void onToggleReaction(activeChatId!, message.id, reaction.emoji)}
+                      >
+                        {reaction.emoji} {reaction.count}
+                      </button>
+                    ))}
+                  </div>
+                ) : null;
+                const replyPreview = message.replyTo ? (
+                  <div className="message__reply">
+                    <span className="message__reply-author">{message.replyTo.author}</span>
+                    <span className="message__reply-text">{message.replyTo.text}</span>
+                  </div>
+                ) : null;
+                const actionBar = canInteract ? (
+                  <div className="message__actions" role="toolbar" aria-label={locale === "ru" ? "Действия" : "Actions"}>
+                    <button type="button" className="message__action-btn" onClick={() => onSetReplyTo(message)}>
+                      {locale === "ru" ? "Ответ" : "Reply"}
+                    </button>
+                    <button type="button" className="message__action-btn" onClick={() => void onToggleReaction(activeChatId!, message.id, "👍")}>
+                      👍
+                    </button>
+                    {message.sender === "me" ? (
+                      <>
+                        <button
+                          type="button"
+                          className="message__action-btn"
+                          onClick={() => {
+                            setEditingMessageId(message.id);
+                            onInputChange(message.text);
+                            requestAnimationFrame(resizeComposerInput);
+                          }}
+                        >
+                          {locale === "ru" ? "Изм." : "Edit"}
+                        </button>
+                        <button
+                          type="button"
+                          className="message__action-btn message__action-btn--danger"
+                          onClick={() => void onDeleteMessage(activeChatId!, message.id)}
+                        >
+                          {locale === "ru" ? "Удалить" : "Delete"}
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null;
                 return (
-                  <div key={message.id}>
+                  <div key={message.id} className="message-wrap">
                     {dayLabel ? <div className="message-day-sep">{dayLabel}</div> : null}
                     {message.sender === "me" ? (
-                      <article className={`message message--me ${message.isTombstone ? "message--tombstone" : ""}`}>
+                      <article className={`message message--me ${message.isTombstone ? "message--tombstone" : ""} ${message.isDeleted ? "message--deleted" : ""}`}>
                         {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
+                        {replyPreview}
                         <div className="message__body-row">
                           <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>
                           {disclosureBadge}
                         </div>
                         {mediaNode}
+                        {actionBar}
+                        {reactionRow}
                         <p className="message__time">{message.time}</p>
                       </article>
                     ) : (
@@ -1295,13 +1419,16 @@ export function ChatPage(props: ChatPageProps) {
                         <div className="message-row__avatar-slot">
                           {isLastInSeries ? <span className="message-row__avatar">{senderInitial(message.author)}</span> : null}
                         </div>
-                        <article className={`message ${message.isTombstone ? "message--tombstone" : ""}`}>
+                        <article className={`message ${message.isTombstone ? "message--tombstone" : ""} ${message.isDeleted ? "message--deleted" : ""}`}>
                           {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
+                          {replyPreview}
                           <div className="message__body-row">
                             <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>
                             {disclosureBadge}
                           </div>
                           {mediaNode}
+                          {actionBar}
+                          {reactionRow}
                           <p className="message__time">{message.time}</p>
                         </article>
                       </div>
@@ -1323,6 +1450,32 @@ export function ChatPage(props: ChatPageProps) {
               submitComposerMessage();
             }}
           >
+            {replyTo ? (
+              <div className="composer__reply">
+                <div className="composer__reply-main">
+                  <span className="composer__reply-author">{replyTo.author}</span>
+                  <span className="composer__reply-text">{replyTo.text}</span>
+                </div>
+                <button type="button" className="icon-button" onClick={onCancelReply} aria-label={locale === "ru" ? "Отменить ответ" : "Cancel reply"}>
+                  ×
+                </button>
+              </div>
+            ) : null}
+            {editingMessageId ? (
+              <p className="composer__edit-hint" role="status">
+                {locale === "ru" ? "Редактирование сообщения" : "Editing message"}
+                <button
+                  type="button"
+                  className="composer__edit-cancel"
+                  onClick={() => {
+                    setEditingMessageId(null);
+                    onInputChange("");
+                  }}
+                >
+                  {locale === "ru" ? "Отмена" : "Cancel"}
+                </button>
+              </p>
+            ) : null}
             <div className="composer__emoji-wrap" ref={emojiRef}>
               <button type="button" className="icon-button" onClick={() => setIsEmojiOpen((prev) => !prev)} aria-label={locale === "ru" ? "Эмодзи" : "Emoji"}>
                 😊

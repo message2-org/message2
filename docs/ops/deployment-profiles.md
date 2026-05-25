@@ -35,9 +35,14 @@ This document maps Message2 to the coursework requirement: a secure client-serve
 
 ## Recommended environment variables
 
+- `DEPLOYMENT_PROFILE`: `public` | `corporate` (all core services).
+- `LAWFUL_ACCESS_ENABLED`: `true` only on public; forced `false` when corporate (see `@message2/contracts` `resolveLawfulAccessEnabled`).
+- `CORPORATE_CONNECTIVITY_MODE`: `isolated` | `federation` | `public_bridge` (corporate install; exposed on `GET /messaging/instance/profile`).
 - `JWT_SECRET`: strong random secret (required in production).
 - `CORS_ALLOWED_ORIGINS`: comma-separated allowed origins for gateway.
-- `MESSAGING_URL`, `MEDIA_URL`, `NOTIFICATIONS_URL`, `AUDIT_URL`: internal service routing.
+- `MESSAGING_URL`, `MEDIA_URL`, `NOTIFICATIONS_URL`, `AUDIT_URL`, `LAWFUL_URL`: internal service routing.
+
+Docker Compose uses `MESSAGE2_DEPLOYMENT_PROFILE`, `MESSAGE2_LAWFUL_ACCESS_ENABLED`, `MESSAGE2_CORPORATE_CONNECTIVITY_MODE` prefixes.
 
 ## Verification checklist
 
