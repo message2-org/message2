@@ -15,7 +15,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
 - Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
-- **Git:** branch `develop`; lawful P0–P6 + messenger v1 + push landed on `develop` (see §5 / `git log`).
+- **Git:** branch `develop` @ `3782087` (lawful P0–P6, messenger v1, push); synced with `origin/develop`.
 - Current local run mode:
   - `pnpm install`
   - Infra (PostgreSQL/Redis/MinIO): `pnpm infra:up` / `pnpm infra:down`
@@ -118,7 +118,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-24: Git branching: `develop` for integration, `main` for releases; see `docs/ops/git-branching.md`.
 - 2026-05-24: Added root `.gitignore`, `AGENTS.md`, README AI section; stopped tracking `dist/`, `node_modules/`, and `*.env`.
 - 2026-05-24: Lawful access P1 — contracts + `access-audit` `/privileged/operations`.
-- 2026-05-25: Landed batch on `develop`: lawful P3–P6, `apps/admin`, messenger v1 actions/realtime, push notifications.
+- 2026-05-25: `3782087` on `develop` — lawful P3–P6, `apps/admin`, messenger v1, push (pushed to `origin/develop`).
 - 2026-05-25: Track B push — `notifications` Web Push/FCM, Prisma subscriptions, web SW + subscribe, messaging `notifyMessagePush`.
 - 2026-05-25: Track B — message edit/delete/reply/react; read receipts + typing + presence; discovery tabs without mocks.
 - 2026-05-25: Lawful access P6 — SIEM export/forward + `docs/ops/compliance/` runbook templates.
