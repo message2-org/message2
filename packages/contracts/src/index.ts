@@ -10,10 +10,30 @@ export interface EncryptedEnvelope {
   mediaId?: string;
 }
 
-export interface TransparencyEvent {
-  id: string;
-  chatId: string;
-  actor: string;
-  reason: string;
-  createdAt: string;
-}
+export type { TransparencyEvent } from "./lawful.js";
+
+export {
+  LAWFUL_REASON_CODES,
+  MIN_LEGAL_REF_LENGTH,
+  MIN_REASON_TEXT_LENGTH,
+  MIN_REASON_TEXT_LENGTH_OTHER,
+  PRIVILEGED_ACTIONS,
+  type DeploymentProfile,
+  type DisclosureLevel,
+  type LawfulReasonCode,
+  type PrivilegedAction,
+  type PrivilegedActor,
+  type PrivilegedOperationRequest,
+  type PrivilegedScope,
+  type TransparencyEventV1,
+  type MessageDisclosureMark,
+  type TransparencyNoticePayload
+} from "./lawful.js";
+
+export {
+  legacyReadBodyToOperation,
+  parsePrivilegedScope,
+  validatePrivilegedOperationRequest,
+  type ValidationError,
+  type ValidatePrivilegedOptions
+} from "./lawful-validation.js";
