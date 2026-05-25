@@ -15,7 +15,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
 - Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
-- **Git:** branch `develop` @ `3782087` (lawful P0–P6, messenger v1, push); synced with `origin/develop`.
+- **Git:** branch `develop` @ `d5ec4c2` (feature `3782087` + docs); synced with `origin/develop`.
 - Current local run mode:
   - `pnpm install`
   - Infra (PostgreSQL/Redis/MinIO): `pnpm infra:up` / `pnpm infra:down`
