@@ -9,8 +9,10 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import jwt from "jsonwebtoken";
 import { PrismaClient, type User } from "@prisma/client";
-import type { EncryptedEnvelope } from "@message2/contracts";
+import type { EncryptedEnvelope, MessageDisclosureMark } from "@message2/contracts";
 import { loadMasterKeys } from "./key-provider.js";
+import { broadcastToUsers, registerSocket, unregisterSocket } from "./realtime.js";
+import { applyTransparencyEvent, type TransparencyIngressPayload } from "./transparency.js";
 
 process.loadEnvFile?.();
 
@@ -21,6 +23,7 @@ app.use(helmet());
 app.use(rateLimit({ windowMs: 60_000, limit: 200, standardHeaders: true, legacyHeaders: false }));
 
 const jwtSecret = process.env.JWT_SECRET ?? "change-me-in-production";
+const internalServiceSecret = process.env.INTERNAL_SERVICE_SECRET ?? "change-me-internal";
 const accessTokenTtl = process.env.ACCESS_TOKEN_TTL ?? "15m";
 const refreshTokenTtl = process.env.REFRESH_TOKEN_TTL ?? "30d";
 const argonMemoryCost = Number(process.env.ARGON2_MEMORY_KB ?? "65536");
@@ -46,7 +49,12 @@ let keyInitLastError: string | null = null;
 type AuthPayload = { sub: string; role: "user" | "admin" };
 type RefreshPayload = { sub: string; role: "user" | "admin"; typ: "refresh" };
 type AuthRequest = express.Request & { auth?: AuthPayload };
-type EncryptedEnvelopeWithSender = EncryptedEnvelope & { senderDisplayName?: string };
+type EncryptedEnvelopeWithSender = EncryptedEnvelope & {
+  senderDisplayName?: string;
+  disclosure?: MessageDisclosureMark;
+  isTombstone?: boolean;
+  tombstoneLabel?: string;
+};
 
 const auth = (req: AuthRequest, res: express.Response, next: express.NextFunction) => {
   const header = req.header("authorization") ?? "";
@@ -961,17 +969,40 @@ app.get("/chats/:chatId/messages", auth, async (req: AuthRequest, res) => {
     return;
   }
 
-  const rows = await prisma.message.findMany({
-    where: { chatId },
-    orderBy: { sentAt: "asc" },
-    include: {
-      sender: {
-        select: {
-          displayName: true
-        }
+  const [rows, disclosures, tombstones] = await Promise.all([
+    prisma.message.findMany({
+      where: { chatId },
+      orderBy: { sentAt: "asc" },
+      include: {
+        sender: { select: { displayName: true } },
+        disclosures: true
       }
+    }),
+    prisma.messageDisclosure.findMany({ where: { chatId } }),
+    prisma.messageTombstone.findMany({ where: { chatId }, orderBy: { deletedAt: "asc" } })
+  ]);
+
+  const disclosureByMessage = new Map<string, MessageDisclosureMark>();
+  for (const row of rows) {
+    const latest = row.disclosures[row.disclosures.length - 1];
+    if (latest) {
+      disclosureByMessage.set(row.id, {
+        eventId: latest.eventId,
+        action: latest.action as MessageDisclosureMark["action"],
+        disclosureLevel: latest.disclosureLevel as MessageDisclosureMark["disclosureLevel"]
+      });
     }
-  });
+  }
+  for (const item of disclosures) {
+    if (!disclosureByMessage.has(item.messageId)) {
+      disclosureByMessage.set(item.messageId, {
+        eventId: item.eventId,
+        action: item.action as MessageDisclosureMark["action"],
+        disclosureLevel: item.disclosureLevel as MessageDisclosureMark["disclosureLevel"]
+      });
+    }
+  }
+
   const envelopes: EncryptedEnvelopeWithSender[] = rows.map((row) => ({
     id: row.id,
     chatId: row.chatId,
@@ -980,15 +1011,79 @@ app.get("/chats/:chatId/messages", auth, async (req: AuthRequest, res) => {
     sentAt: row.sentAt.toISOString(),
     kind: row.kind,
     mediaId: row.mediaId ?? undefined,
-    senderDisplayName: row.sender.displayName
+    senderDisplayName: row.sender.displayName,
+    disclosure: disclosureByMessage.get(row.id)
   }));
+
+  for (const tomb of tombstones) {
+    envelopes.push({
+      id: tomb.messageId,
+      chatId: tomb.chatId,
+      senderId: tomb.senderId ?? "00000000-0000-0000-0000-000000000000",
+      cipherText: "",
+      sentAt: (tomb.sentAt ?? tomb.deletedAt).toISOString(),
+      kind: tomb.kind ?? "text",
+      isTombstone: true,
+      tombstoneLabel: tomb.label,
+      disclosure: {
+        eventId: tomb.eventId,
+        action: "message_delete",
+        disclosureLevel: "partial"
+      }
+    });
+  }
+
+  envelopes.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
   res.json(envelopes);
+});
+
+app.get("/transparency/notices", auth, async (req: AuthRequest, res) => {
+  const notices = await prisma.transparencyUserNotice.findMany({
+    where: { userId: req.auth!.sub },
+    orderBy: { createdAt: "desc" },
+    take: 50
+  });
+  res.json(
+    notices.map((notice) => ({
+      id: notice.id,
+      eventId: notice.eventId,
+      action: notice.action,
+      scope: JSON.parse(notice.scopeJson),
+      disclosureLevel: notice.disclosureLevel,
+      summary: notice.summary,
+      createdAt: notice.createdAt.toISOString(),
+      readAt: notice.readAt?.toISOString() ?? null
+    }))
+  );
+});
+
+const requireInternalService = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const secret = req.header("x-internal-secret") ?? "";
+  if (!secret || secret !== internalServiceSecret) {
+    res.status(401).json({ error: "invalid internal service credentials" });
+    return;
+  }
+  next();
+};
+
+app.post("/internal/transparency", requireInternalService, async (req, res) => {
+  try {
+    const payload = req.body as TransparencyIngressPayload;
+    if (!payload?.id || !payload?.action || !payload?.scope) {
+      res.status(400).json({ error: "invalid transparency payload" });
+      return;
+    }
+    const result = await applyTransparencyEvent(prisma, payload);
+    res.status(202).json({ ok: true, ...result });
+  } catch (error) {
+    console.error("[internal/transparency]", error);
+    res.status(500).json({ error: "failed to apply transparency event" });
+  }
 });
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
-const sockets = new Map<WebSocket, string>();
 wss.on("connection", (socket, req) => {
   const requestUrl = new URL(req.url ?? "/ws", "http://localhost");
   const token = requestUrl.searchParams.get("token") ?? "";
@@ -1002,12 +1097,12 @@ wss.on("connection", (socket, req) => {
       socket.close();
       return;
     }
-    sockets.set(socket, decoded.sub);
+    registerSocket(socket, decoded.sub);
   } catch {
     socket.close();
     return;
   }
-  socket.on("close", () => sockets.delete(socket));
+  socket.on("close", () => unregisterSocket(socket));
 });
 
 app.post("/chats/:chatId/messages", auth, async (req: AuthRequest, res) => {
@@ -1048,12 +1143,10 @@ app.post("/chats/:chatId/messages", auth, async (req: AuthRequest, res) => {
     where: { chatId },
     select: { userId: true }
   });
-  const memberIds = new Set(members.map((member) => member.userId));
-  for (const [socket, socketUserId] of sockets) {
-    if (memberIds.has(socketUserId)) {
-      socket.send(JSON.stringify({ type: "message.created", payload: envelope }));
-    }
-  }
+  broadcastToUsers(
+    members.map((member) => member.userId),
+    { type: "message.created", payload: envelope }
+  );
   res.status(201).json(envelope);
 });
 

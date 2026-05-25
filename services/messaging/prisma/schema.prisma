@@ -19,6 +19,7 @@ model User {
   sentMessages   Message[]        @relation("SenderMessages")
   refreshSession RefreshSession[]
   privateProfile UserPrivateProfile?
+  transparencyNotices TransparencyUserNotice[]
 }
 
 model Chat {
@@ -27,6 +28,8 @@ model Chat {
   createdAt DateTime     @default(now())
   members   ChatMember[]
   messages  Message[]
+  disclosures MessageDisclosure[]
+  tombstones MessageTombstone[]
 }
 
 model ChatMember {
@@ -50,8 +53,55 @@ model Message {
   mediaId    String?   @db.Uuid
   chat       Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
   sender     User      @relation("SenderMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  disclosures MessageDisclosure[]
 
   @@index([chatId, sentAt(sort: Desc)])
+}
+
+model MessageDisclosure {
+  id              String   @id @default(uuid()) @db.Uuid
+  messageId       String   @db.Uuid
+  chatId          String   @db.Uuid
+  eventId         String
+  action          String
+  disclosureLevel String
+  createdAt       DateTime @default(now())
+  message         Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  chat            Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, eventId])
+  @@index([chatId])
+}
+
+model MessageTombstone {
+  id        String    @id @default(uuid()) @db.Uuid
+  messageId String    @db.Uuid
+  chatId    String    @db.Uuid
+  eventId   String
+  senderId  String?   @db.Uuid
+  kind      String?
+  sentAt    DateTime?
+  label     String
+  deletedAt DateTime  @default(now())
+  chat      Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, eventId])
+  @@index([chatId])
+}
+
+model TransparencyUserNotice {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @db.Uuid
+  eventId         String
+  action          String
+  scopeJson       String
+  disclosureLevel String
+  summary         String?
+  createdAt       DateTime  @default(now())
+  readAt          DateTime?
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model RefreshSession {
