@@ -15,7 +15,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
 - Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
-- **Git:** default branch **`develop`** (GitHub); do not merge to **`main`** until a release milestone (web/Android/desktop). HEAD synced with `origin/develop`.
+- **Git:** default branch **`develop`** (GitHub) @ `a2e8848`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`.
 - Current local run mode:
   - `pnpm install`
   - Infra (PostgreSQL/Redis/MinIO): `pnpm infra:up` / `pnpm infra:down`
@@ -144,6 +144,7 @@ Task: <опишите задачу — task_id/scope необязательны;
 Derive task_id + scope, show me, claim if free, branch feature/<task_id>, then work.
 If task_id already in_progress by another agent: stop and report.
 Default next: Track D Android (push done). See docs/product/client-platform-roadmap.md.
+Git: PR/feature branches → develop only; do not merge to main without user release request.
 On finish: pull develop, test, PR→develop; release claim; update §2–5. Do not change section 1.
 ```
 
