@@ -4,7 +4,7 @@
 
 Spec: [lawful-access-transparency.md](./lawful-access-transparency.md) · Phases: §13 there.
 
-Last updated: **2026-05-24** (compliance audit)
+Last updated: **2026-05-24** (P1–P2 done; handoff for new agents)
 
 ---
 
@@ -116,13 +116,28 @@ Last updated: **2026-05-24** (compliance audit)
 
 ---
 
+## Planned next (for new agents — 2026-05-24)
+
+| Priority | Phase | Task |
+|----------|-------|------|
+| 1 | P3 | New `services/lawful-access`, `/lawful/v1/operations`, gateway (public only), mTLS |
+| 2 | P1 | Postgres append-only audit (replace `access-audit` in-memory store) |
+| 3 | P4 | Complaints API + web detail screen + `apps/admin` install wizard |
+| 4 | P0 | Wire `DEPLOYMENT_PROFILE` / `LAWFUL_ACCESS_ENABLED` in compose + runtime guards |
+| alt | v1 | Message edit/delete/react; receipts/typing/presence; real push |
+
+**Develop commits (local, may need push):** `ab86195` docs → `e758c76` P1 → `25f178d` messaging P2 → `9973eeb` web P2.
+
+---
+
 ## Compliance audit (2026-05-24)
 
 | Area | Docs say | Code reality | Verdict |
 |------|----------|--------------|---------|
 | Monorepo layout | AGENTS / ai-context | Matches `apps/web`, `services/*`, `packages/contracts` | ✅ |
-| Lawful access P1–P6 | requirements v2+, spec | Stubs only (`access-audit`, notifications) | ⬜ expected |
-| `DEPLOYMENT_PROFILE` | deployment-profiles | Not in `.env.example` / compose | ⬜ |
+| Lawful access P1–P2 | spec | Implemented (see phases above) | ✅ |
+| Lawful access P3–P6 | spec | Not started | ⬜ planned |
+| `DEPLOYMENT_PROFILE` | deployment-profiles | `access-audit` `.env.example` only | 🟡 |
 | E2EE | e2ee-design, README | `cipherText` JSON/plain; no Double Ratchet | ⬜ |
 | Argon2id | deployment-profiles | Implemented in messaging | ✅ (README was stale; fixed) |
 | Refresh rotation | ai-context priority | `/auth/refresh` rotates + revokes | 🟡 partial vs “production-grade” |
@@ -140,6 +155,7 @@ Last updated: **2026-05-24** (compliance audit)
 
 | Date | Change |
 |------|--------|
+| 2026-05-24 | Handoff section + audit refresh; P1–P2 marked done for new agents |
 | 2026-05-24 | **P2 implemented:** Prisma tombstones/disclosures/notices, internal transparency API, WS + web badge/banner |
 | 2026-05-24 | **P1 implemented:** contracts validation, `POST /privileged/operations`, env example, tests |
 | 2026-05-24 | Compliance audit section added (docs vs code matrix) |

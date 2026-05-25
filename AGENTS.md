@@ -65,9 +65,23 @@ After `pnpm install`, local `.env` files are created by `scripts/setup-envs.mjs`
 - Branch naming: `feature/…`, `fix/…`, `chore/…` from `develop`.
 - Full model: [docs/ops/git-branching.md](docs/ops/git-branching.md).
 
+## New agent / cloud agent handoff
+
+1. Read [docs/ai-context.md](docs/ai-context.md) §6 (handoff prompt).
+2. Read [lawful-access-implementation-status.md](docs/security/lawful-access-implementation-status.md) § Planned next.
+3. Default continuation: **lawful access P3** unless the user chooses v1 messenger gaps.
+
+Lawful flow env: `INTERNAL_SERVICE_SECRET` must match in `services/messaging` and `services/access-audit`.
+
+```bash
+pnpm --filter @message2/contracts test
+pnpm --filter @message2/access-audit test
+pnpm --filter @message2/messaging test
+```
+
 ## When finishing a task
 
-Update **sections 2–5** in `docs/ai-context.md` (status, priorities, short decision-log line). Do not change section 1 (coursework topic).
+Update **sections 2–5** in `docs/ai-context.md` (status, priorities, short decision-log line). Update **lawful-access-implementation-status.md** checkboxes/changelog. Do not change section 1 (coursework topic).
 
 ## Security note
 
