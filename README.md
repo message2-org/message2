@@ -148,7 +148,7 @@ Detailed runbook and recommended controls: `docs/ops/deployment-profiles.md`.
 
 ## Git workflow
 
-Daily work merges into **`develop`**; **`main`** receives tested releases (tags). See [docs/ops/git-branching.md](docs/ops/git-branching.md).
+**GitHub default branch: `develop`.** All daily work and PRs target `develop`. **`main`** is updated only for large release milestones (packaged web/Android/desktop), not after every feature batch. See [docs/ops/git-branching.md](docs/ops/git-branching.md).
 
 ## Project Feedback And Contact
 

@@ -6,8 +6,8 @@ Lightweight [Git Flow](https://nvie.com/posts/a-successful-git-branching-model/)
 
 | Branch | Purpose | Merges from | Merges to |
 |--------|---------|-------------|-----------|
-| `main` | Production-ready history; tagged releases (`v0.1.0`, …) | `develop`, `hotfix/*` | — |
-| `develop` | Daily integration; CI must pass here | `feature/*`, `fix/*`, `chore/*`, `release/*` | `main` |
+| `main` | **Rare** production snapshots; tagged releases (`v0.1.0`, …) only after large milestones | `release/*`, `hotfix/*` | — |
+| `develop` | **Default branch** (GitHub); all day-to-day integration and CI | `feature/*`, `fix/*`, `chore/*` | `main` only via explicit `release/*` |
 | `feature/*` | New capability (e.g. `feature/media-minio`) | — | `develop` |
 | `fix/*` | Bugfix on top of current integration | — | `develop` |
 | `chore/*` | Tooling, docs, repo hygiene | — | `develop` |
@@ -29,14 +29,16 @@ feature/*      o--o      o--o
 1. Branch from `develop`: `git checkout develop && git pull && git checkout -b feature/my-change`
 2. Commit in small logical chunks on the feature branch.
 3. Open PR (or merge locally): `feature/*` → `develop`; run `pnpm build && pnpm test`.
-4. When releasing: `release/v0.x.y` from `develop` → merge to `main` + tag → merge back to `develop`.
-5. Hotfix from `main` only when production is broken; always merge hotfix into `develop` too.
+4. **Do not merge `develop` → `main` routinely.** Merge to `main` only for **large, release-shaped milestones** (e.g. first packaged web build, Android store track, desktop installer) via `release/v0.x.y` → `main` + tag → merge back to `develop`.
+5. Hotfix from `main` only when a tagged production line is broken; always merge hotfix into `develop` too.
 
 ## Solo / small team shortcuts
 
 - Small, safe changes (docs, typos): commit directly on `develop`.
 - Anything touching auth, crypto, media, or multi-service behavior: use a short-lived `feature/*` branch.
-- Keep `main` deployable; do not develop day-to-day on `main`.
+- **Default remote branch is `develop`** (GitHub). Clone, PRs, and agents target `develop`.
+- Do **not** open PRs to `main` for normal feature work. Do **not** merge `develop` into `main` “to sync” without a release decision.
+- Keep `main` for tagged release lines only; all feature integration stays on `develop`.
 
 ## Multiple Cursor / cloud agents
 
@@ -52,19 +54,21 @@ Parallel agents on **different** `task_id` branches are safe; conflicts appear o
 
 ## Protected branch recommendations (GitHub)
 
-- `main`: require PR, require CI, no force-push.
-- `develop`: require CI on PR; optional require PR for org repos.
+- `develop` (default): require CI on PR; optional require PR for org repos.
+- `main`: require PR, require CI, no force-push; restrict who can merge (release maintainer).
+
+## Repository default branch
+
+**GitHub default branch: `develop`.** New clones and PRs should use `develop` as the base. `main` stays behind until a deliberate release merge.
 
 ## First-time setup (already done in repo)
 
 ```bash
-git checkout main
-git checkout -b develop
-# work on develop or feature branches; merge to main via release
-git push -u origin develop
+git clone <repo>
+git checkout develop   # default branch
+git pull origin develop
+# feature branches from develop; merge to main only via release/*
 ```
-
-Set default branch to `develop` in GitHub only if the team agrees; otherwise keep `main` as default and use PRs into `develop` for daily work.
 
 ## Related
 

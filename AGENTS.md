@@ -67,7 +67,8 @@ After `pnpm install`, local `.env` files are created by `scripts/setup-envs.mjs`
 
 ## Git branches
 
-- Integrate on **`develop`**; keep **`main`** for releases/tags.
+- **Default branch: `develop`** (GitHub). Integrate all work there; **do not PR or merge to `main`** unless the user requests a release milestone (web/Android/desktop packaging).
+- **`main`:** tagged releases only — not for day-to-day merges.
 - **Agents:** one `task_id` → `feature/<task_id>` → PR → `develop` (see agent-coordination).
 - Branch naming: `feature/…`, `fix/…`, `chore/…` from `develop`.
 - Full model: [docs/ops/git-branching.md](docs/ops/git-branching.md).

@@ -15,7 +15,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
 - Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
-- **Git:** branch `develop` @ `d5ec4c2` (feature `3782087` + docs); synced with `origin/develop`.
+- **Git:** default branch **`develop`** (GitHub); do not merge to **`main`** until a release milestone (web/Android/desktop). HEAD synced with `origin/develop`.
 - Current local run mode:
   - `pnpm install`
   - Infra (PostgreSQL/Redis/MinIO): `pnpm infra:up` / `pnpm infra:down`
@@ -115,7 +115,8 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 ## 5) Decision Log (Mutable)
 
 - 2026-05-24: Four commits on `develop`: docs lawful-access; P1 access-audit; P2 messaging; P2 web UI.
-- 2026-05-24: Git branching: `develop` for integration, `main` for releases; see `docs/ops/git-branching.md`.
+- 2026-05-25: GitHub default branch `develop`; `main` only for large releases (not routine merges) — `docs/ops/git-branching.md`.
+- 2026-05-24: Git branching: `develop` for integration, `main` for tagged releases; see `docs/ops/git-branching.md`.
 - 2026-05-24: Added root `.gitignore`, `AGENTS.md`, README AI section; stopped tracking `dist/`, `node_modules/`, and `*.env`.
 - 2026-05-24: Lawful access P1 — contracts + `access-audit` `/privileged/operations`.
 - 2026-05-25: `3782087` on `develop` — lawful P3–P6, `apps/admin`, messenger v1, push (pushed to `origin/develop`).
