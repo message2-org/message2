@@ -86,6 +86,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `web-auth-interactive-states` | `done` | `cursor:auth-hover` | `2026-05-26` | `apps/web/src/index.css` AuthPage hover/active | `feature/web-auth-interactive-states` | PR #6 merged |
 | `track-c-e2ee-web-wire` | `done` | `cursor:track-c-e2ee` | `2026-05-26` | `packages/contracts`, `services/messaging`, `apps/web` | `feature/track-c-e2ee-web-wire` | PR #5 merged |
 | `track-b-web-session-restore` | `done` | `cursor:web-session-restore` | `2026-05-26` | `apps/web/src/auth` | `feature/track-b-web-session-restore` | PR #3 merged |
+| `track-c-e2ee-media-wire` | `in_progress` | `cursor:track-c-e2ee-media` | `2026-05-26` | `apps/web/src/e2ee`, `services/media`, `packages/contracts` | `feature/track-c-e2ee-media-wire` | media E2EE start |
 
 ### Planned next (pick one track for new agents)
 

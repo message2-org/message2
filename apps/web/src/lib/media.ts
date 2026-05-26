@@ -57,6 +57,11 @@ export async function uploadMediaFile(accessToken: string, file: File): Promise<
 }
 
 export async function fetchMediaBlobUrl(accessToken: string, mediaId: string): Promise<string> {
+  const blob = await fetchMediaBlob(accessToken, mediaId);
+  return URL.createObjectURL(blob);
+}
+
+export async function fetchMediaBlob(accessToken: string, mediaId: string): Promise<Blob> {
   let lastError: Error | null = null;
 
   for (const baseUrl of MEDIA_API_BASE_URLS) {
@@ -74,8 +79,7 @@ export async function fetchMediaBlobUrl(accessToken: string, mediaId: string): P
         }
         throw new Error("media not found");
       }
-      const blob = await response.blob();
-      return URL.createObjectURL(blob);
+      return await response.blob();
     } catch (error) {
       if (error instanceof Error && error.message === "UNAUTHORIZED") {
         throw error;
