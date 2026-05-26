@@ -75,6 +75,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | task_id | status | owner | since | scope | branch | notes |
 |---------|--------|-------|-------|-------|--------|-------|
 | `web-auth-register-avatar-placeholder` | `done` | `cursor:web-auth-avatar` | `2026-05-26` | `apps/web` AuthPage register avatar | `feature/web-auth-register-avatar-placeholder` | PR #1 merged |
+| `admin-install-wizard-connectivity` | `done` | `cursor:admin-install-wizard` | `2026-05-26` | `apps/admin` | `feature/admin-install-wizard-connectivity` | PR pending |
 
 ### Planned next (pick one track for new agents)
 
@@ -95,7 +96,8 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 **Track B-admin — Operator console (`apps/admin`)**
 
 - [x] Lawful P4–P6 MVP (wizard, complaints, encryption, SIEM export)
-- [ ] Extend only for corporate demo gaps (not a blocker for Android)
+- [x] Install wizard: corporate connectivity UX (cards, env snippets, server drift)
+- [ ] Extend only for other corporate demo gaps (federation runtime — not coded)
 
 **Track C — Security / product**
 
@@ -133,6 +135,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-25: Multi-agent coordination — claims table + `feature/<task_id>` + PR (`docs/ops/agent-coordination.md`, `.cursor/rules/agent-coordination.mdc`).
 - 2026-05-25: Client platform order documented — web v1 → push → Android → Tauri desktop → iOS (`docs/product/client-platform-roadmap.md`).
 - 2026-05-05: `pnpm dev:web` without Docker; full stack needs `pnpm infra:up` or `pnpm dev:full`.
+- 2026-05-26: Admin install wizard — corporate connectivity cards, env snippets, drift vs `GET /instance/profile` (`apps/admin`).
 
 ## 6) Handoff for new Cursor / cloud agents
 

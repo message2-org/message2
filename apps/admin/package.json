@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "node --test src/smoke.test.ts"
+    "test": "node --import tsx --test src/smoke.test.ts src/install-config.test.ts"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -16,6 +16,7 @@
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.3",
     "vite": "^6.3.4"
   }
