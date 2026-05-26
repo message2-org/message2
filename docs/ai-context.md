@@ -88,6 +88,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `track-c-e2ee-web-wire` | `done` | `cursor:track-c-e2ee` | `2026-05-26` | `packages/contracts`, `services/messaging`, `apps/web` | `feature/track-c-e2ee-web-wire` | PR #5 merged |
 | `track-b-web-session-restore` | `done` | `cursor:web-session-restore` | `2026-05-26` | `apps/web/src/auth` | `feature/track-b-web-session-restore` | PR #3 merged |
 | `track-c-e2ee-media-wire` | `done` | `cursor:track-c-e2ee-media` | `2026-05-26` | `apps/web/src/e2ee`, `services/media`, `packages/contracts` | `feature/track-c-e2ee-media-wire` | PR #7 merged |
+| `chore-untrack-node-modules` | `in_progress` | `cursor:chore-untrack-node-modules` | `2026-05-26` | repo git index | `feature/chore-untrack-node-modules` | stop tracking committed `node_modules` |
 
 ### Planned next (pick one track for new agents)
 
