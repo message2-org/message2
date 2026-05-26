@@ -85,7 +85,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `fix-ci-develop-green` | `done` | `cursor:ci-develop-green` | `2026-05-26` | monorepo CI + docs merge policy | `fix/ci-develop-green` | PR #4 merged; `develop` CI green |
 | `web-auth-interactive-states` | `done` | `cursor:auth-hover` | `2026-05-26` | `apps/web/src/index.css` AuthPage hover/active | `feature/web-auth-interactive-states` | PR #6 merged |
 | `track-c-e2ee-web-wire` | `done` | `cursor:track-c-e2ee` | `2026-05-26` | `packages/contracts`, `services/messaging`, `apps/web` | `feature/track-c-e2ee-web-wire` | PR #5 merged |
-| `track-b-web-session-restore` | `in_progress` | `cursor:web-session-restore` | `2026-05-26` | `apps/web/src/auth` | `feature/track-b-web-session-restore` | PR #3 |
+| `track-b-web-session-restore` | `done` | `cursor:web-session-restore` | `2026-05-26` | `apps/web/src/auth` | `feature/track-b-web-session-restore` | PR #3 merged |
 
 ### Planned next (pick one track for new agents)
 
