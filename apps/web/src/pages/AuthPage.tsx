@@ -1,8 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { buildAvatarGradient, buildUserInitials } from "../lib/avatar";
 import { copy, localeOptions, Locale } from "../i18n";
 import { AuthMode } from "../types";
-import { BrandLogo, GitHubMark } from "../components/ui-icons";
+import { BrandLogo, CameraIcon, GitHubMark } from "../components/ui-icons";
 
 type AuthPageProps = {
   theme: "light" | "dark";
@@ -86,9 +85,6 @@ export function AuthPage(props: AuthPageProps) {
   const t = copy[locale];
   const localeFlagIcon = localeOptions[locale].flag;
   const themeIcon = theme === "dark" ? "/icons/moon.svg" : "/icons/sun.svg";
-  const registerAvatarSeed = username.trim().toLowerCase() || "user";
-  const registerAutoInitials = buildUserInitials(displayName, username);
-  const registerAutoGradient = buildAvatarGradient(registerAvatarSeed);
   const [loadingStep, setLoadingStep] = useState(0);
   const [loadingDots, setLoadingDots] = useState(1);
   const loadingLines = useMemo(
@@ -182,14 +178,15 @@ export function AuthPage(props: AuthPageProps) {
           {authMode === "register" ? (
             <div className="auth-register-avatar">
               <div className="auth-avatar-picker-wrap">
-                <label className="auth-avatar-picker" title={locale === "ru" ? "Загрузить фото" : "Upload photo"}>
+                <label
+                  className={`auth-avatar-picker auth-avatar-picker--register${registerAvatarPreview ? " auth-avatar-picker--has-photo" : ""}`}
+                  title={locale === "ru" ? "Загрузить фото" : "Upload photo"}
+                >
                   <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onRegisterAvatarUpload(event.target.files?.[0] ?? null)} />
                   {registerAvatarPreview ? (
                     <img src={registerAvatarPreview} alt="" />
                   ) : (
-                    <span className="chat-avatar profile-auto-avatar" style={{ backgroundImage: registerAutoGradient }}>
-                      {registerAutoInitials}
-                    </span>
+                    <CameraIcon />
                   )}
                 </label>
                 {registerAvatarPreview ? (

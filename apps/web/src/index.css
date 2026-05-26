@@ -180,6 +180,23 @@ body {
   transform: translateY(-6px);
 }
 
+.auth-avatar-picker--register {
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.auth-avatar-picker--register:not(.auth-avatar-picker--has-photo) svg {
+  width: 36px;
+  height: 36px;
+  transform: none;
+}
+
+.auth-avatar-picker--register.auth-avatar-picker--has-photo {
+  border-style: solid;
+  background: var(--panel);
+}
+
 .auth-avatar-picker span {
   position: absolute;
   bottom: 8px;
