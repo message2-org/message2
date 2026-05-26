@@ -15,7 +15,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
 - Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
-- **Git:** default branch **`develop`** (GitHub) @ `9a96c3b`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`. **CI on `develop` is green** (workflow: `pnpm install` → Prisma generate for access-audit, notifications, messaging → `pnpm build` → `pnpm test`).
+- **Git:** default branch **`develop`** (GitHub) @ `de5a04e`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`. **CI on `develop` is green** (workflow: `pnpm install` → Prisma generate for access-audit, notifications, messaging → `pnpm build` → `pnpm test`).
 - **Integration:** merge to `develop` only after **green CI** on the PR (see `docs/ops/agent-coordination.md`, `docs/product/requirements.md`).
 - Current local run mode:
   - `pnpm install`
@@ -25,7 +25,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
   - Split backend: `pnpm dev:backend:core` (gateway + messaging) or `pnpm dev:backend` (all services)
   - Per-service: `pnpm dev:gateway`, `dev:messaging`, `dev:media`, `dev:notifications`, `dev:audit`, `dev:lawful`, `dev:admin` (:5174)
   - DB wipe (dev only): `pnpm db:reset` (Docker volume + migrations) or `pnpm db:clear` (Prisma reset, infra must be up)
-  - After pull: **`pnpm db:migrate:deploy`** (incl. `20260525200000_push_subscriptions`)
+  - After pull: **`pnpm db:migrate:deploy`** (incl. `20260525200000_push_subscriptions`, `20260526120000_e2ee_prekeys`)
 - Authentication baseline:
   - required: `username`, `password`
   - optional: `displayName`
@@ -72,6 +72,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - [x] Track B: message edit/delete/reply/react; read/typing/presence WS; Web Push + FCM dispatch; discovery v2 placeholder.
 - [x] Admin install wizard: corporate connectivity cards, env snippets, drift vs `GET /instance/profile` (PR #2).
 - [x] CI on `develop`: monorepo `pnpm build` + `pnpm test` green; isolated Prisma clients; workflow `prisma:generate` steps (PR #4).
+- [x] Track C: DM E2EE web wire (`e2ee_strict` text DMs, prekeys API, Double Ratchet); PR #5.
 
 ### Active work (claims) — multi-agent
 
@@ -83,7 +84,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `admin-install-wizard-connectivity` | `done` | `cursor:admin-install-wizard` | `2026-05-26` | `apps/admin` | `feature/admin-install-wizard-connectivity` | PR #2 merged |
 | `fix-ci-develop-green` | `done` | `cursor:ci-develop-green` | `2026-05-26` | monorepo CI + docs merge policy | `fix/ci-develop-green` | PR #4 merged; `develop` CI green |
 | `web-auth-interactive-states` | `done` | `cursor:auth-hover` | `2026-05-26` | `apps/web/src/index.css` AuthPage hover/active | `feature/web-auth-interactive-states` | PR #6 merged |
-| `track-c-e2ee-web-wire` | `in_progress` | `cursor:track-c-e2ee` | `2026-05-26` | `packages/contracts`, `services/messaging`, `apps/web` | `feature/track-c-e2ee-web-wire` | PR #5 merging |
+| `track-c-e2ee-web-wire` | `done` | `cursor:track-c-e2ee` | `2026-05-26` | `packages/contracts`, `services/messaging`, `apps/web` | `feature/track-c-e2ee-web-wire` | PR #5 merged |
 
 ### Planned next (pick one track for new agents)
 
@@ -146,7 +147,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-26: Admin install wizard — corporate connectivity cards, env snippets, drift vs `GET /instance/profile` (`apps/admin`); PR #2 → `develop`.
 - 2026-05-26: Green CI policy documented; PR #4 — TS/Prisma fixes, CI workflow `prisma:generate`, `develop` build/test green.
 - 2026-05-26: AuthPage hover/active affordances (inputs, avatar, language, theme, submit) — `apps/web/src/index.css`; PR #6 → `develop`.
-- 2026-05-26: Track C — DM E2EE prekeys API + web Double Ratchet wire (`e2ee_strict` text DMs); migration `20260526120000_e2ee_prekeys`.
+- 2026-05-26: Track C — DM E2EE prekeys API + web Double Ratchet wire (`e2ee_strict` text DMs); migration `20260526120000_e2ee_prekeys`; PR #5 → `develop`.
 
 ## 6) Handoff for new Cursor / cloud agents
 
