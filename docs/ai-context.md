@@ -82,6 +82,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `web-auth-register-avatar-placeholder` | `done` | `cursor:web-auth-avatar` | `2026-05-26` | `apps/web` AuthPage register avatar | `feature/web-auth-register-avatar-placeholder` | PR #1 merged |
 | `admin-install-wizard-connectivity` | `done` | `cursor:admin-install-wizard` | `2026-05-26` | `apps/admin` | `feature/admin-install-wizard-connectivity` | PR #2 merged |
 | `fix-ci-develop-green` | `done` | `cursor:ci-develop-green` | `2026-05-26` | monorepo CI + docs merge policy | `fix/ci-develop-green` | PR #4 merged; `develop` CI green |
+| `web-auth-interactive-states` | `done` | `cursor:auth-hover` | `2026-05-26` | `apps/web/src/index.css` AuthPage hover/active | `feature/web-auth-interactive-states` | PR #6 merged |
 | `track-c-e2ee-web-wire` | `in_progress` | `cursor:track-c-e2ee` | `2026-05-26` | `packages/contracts`, `services/messaging`, `apps/web` | `feature/track-c-e2ee-web-wire` | PR #5 merging |
 
 ### Planned next (pick one track for new agents)
@@ -144,6 +145,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-05: `pnpm dev:web` without Docker; full stack needs `pnpm infra:up` or `pnpm dev:full`.
 - 2026-05-26: Admin install wizard — corporate connectivity cards, env snippets, drift vs `GET /instance/profile` (`apps/admin`); PR #2 → `develop`.
 - 2026-05-26: Green CI policy documented; PR #4 — TS/Prisma fixes, CI workflow `prisma:generate`, `develop` build/test green.
+- 2026-05-26: AuthPage hover/active affordances (inputs, avatar, language, theme, submit) — `apps/web/src/index.css`; PR #6 → `develop`.
 - 2026-05-26: Track C — DM E2EE prekeys API + web Double Ratchet wire (`e2ee_strict` text DMs); migration `20260526120000_e2ee_prekeys`.
 
 ## 6) Handoff for new Cursor / cloud agents
