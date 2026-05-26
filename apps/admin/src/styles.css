@@ -1,92 +1,176 @@
-:root {
-  font-family: Inter, system-ui, sans-serif;
-  line-height: 1.4;
-  color: #0f172a;
-  background: #f1f5f9;
-}
+/* Install wizard + page-specific overrides (theme tokens in theme.css) */
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-.admin-shell {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 24px 16px 48px;
-}
-
-.admin-card {
-  background: #fff;
-  border: 1px solid #cbd5e1;
+.install-wizard fieldset {
+  border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
+  margin: 16px 0 0;
+  padding: 12px;
+  background: color-mix(in srgb, var(--soft) 40%, transparent);
 }
 
-.admin-nav {
+.install-wizard legend {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 4px;
+  color: var(--text);
+}
+
+.wizard-radio-row {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .wizard-radio-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.wizard-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  margin: 0;
+  background: var(--soft);
+  color: var(--text);
+}
+
+.wizard-choice input {
+  width: auto;
+  margin-top: 3px;
+}
+
+.wizard-choice.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--soft));
+}
+
+.wizard-choice.caution.selected {
+  border-color: #d97706;
+  background: color-mix(in srgb, #fbbf24 18%, var(--soft));
+}
+
+.wizard-choice-block {
+  grid-template-columns: auto 1fr;
+  margin-bottom: 8px;
+}
+
+.wizard-choice-title {
+  font-weight: 600;
+  font-size: 14px;
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.wizard-choice-desc {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.wizard-tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.wizard-tag.caution {
+  background: color-mix(in srgb, #fbbf24 35%, transparent);
+  color: #b45309;
+}
+
+.theme-dark .wizard-tag.caution {
+  color: #fcd34d;
+}
+
+.wizard-hint {
+  margin: 0 0 10px;
+}
+
+.wizard-connectivity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.wizard-checkbox {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
+  margin: 0;
+  color: var(--text);
 }
 
-.admin-nav button {
-  border: 1px solid #94a3b8;
-  background: #fff;
-  border-radius: 8px;
-  padding: 8px 12px;
-  cursor: pointer;
+.wizard-checkbox input {
+  width: auto;
 }
 
-.admin-nav button.active {
-  border-color: #2563eb;
-  color: #2563eb;
+.wizard-callout {
+  font-size: 13px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 0 0;
 }
 
-label {
-  display: block;
-  margin: 8px 0 4px;
+.wizard-callout.caution {
+  background: color-mix(in srgb, #fbbf24 22%, var(--soft));
+  border: 1px solid color-mix(in srgb, #f59e0b 45%, var(--border));
+  color: var(--text);
+}
+
+.wizard-callout.warn {
+  background: color-mix(in srgb, var(--field-error) 14%, var(--soft));
+  border: 1px solid color-mix(in srgb, var(--field-error) 40%, var(--border));
+  color: var(--text);
+}
+
+.wizard-callout ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.wizard-server-panel,
+.wizard-env-panel {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.wizard-server-panel h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.wizard-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 0;
   font-size: 13px;
 }
 
-input,
-select,
-textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  font: inherit;
+.wizard-dl dt {
+  color: var(--muted);
 }
 
-button.primary {
-  margin-top: 12px;
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 14px;
-  cursor: pointer;
+.wizard-dl dd {
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  color: var(--text);
 }
 
-.complaint-row {
-  border-top: 1px solid #e2e8f0;
-  padding: 12px 0;
-}
-
-.complaint-row:first-child {
-  border-top: none;
-}
-
-.muted {
-  color: #64748b;
-  font-size: 13px;
-}
-
-.error {
-  color: #b91c1c;
-  font-size: 13px;
+.wizard-env-panel textarea {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  margin-bottom: 10px;
 }

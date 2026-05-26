@@ -90,7 +90,7 @@ Last updated: **2026-05-25** (P1–P3 done; handoff for new agents)
 | `Complaint` entity + API | ✅ | Prisma `complaints`; internal + admin routes in `access-audit` |
 | User complaint via messaging | ✅ | `POST /transparency/complaints`, `GET /transparency/notices/:eventId` |
 | `apps/admin` | ✅ | `pnpm dev:admin` :5174 |
-| Install wizard (profile + connectivity) | 🟡 | Local config MVP in admin UI |
+| Install wizard (profile + connectivity) | ✅ | Corporate connectivity cards, env snippets, drift vs `GET /instance/profile` |
 
 ### P5 — Encryption policy (corporate flexible + public hybrid)
 

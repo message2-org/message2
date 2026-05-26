@@ -1,9 +1,18 @@
 import { FormEvent, useState } from "react";
 import type { AdminSession } from "../App";
+import { BrandLogo } from "../components/BrandLogo";
+import { ThemeToggle } from "../components/ThemeToggle";
+import type { Theme } from "../hooks/useTheme";
 
 const API_BASES = ["/messaging", "http://localhost:4000/messaging", "http://localhost:4001"];
 
-export function LoginPage({ onLogin }: { onLogin: (session: AdminSession) => void }) {
+type LoginPageProps = {
+  theme: Theme;
+  onThemeToggle: () => void;
+  onLogin: (session: AdminSession) => void;
+};
+
+export function LoginPage({ theme, onThemeToggle, onLogin }: LoginPageProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -51,25 +60,53 @@ export function LoginPage({ onLogin }: { onLogin: (session: AdminSession) => voi
   };
 
   return (
-    <div className="admin-shell">
-      <form className="admin-card" onSubmit={handleSubmit}>
-        <h1>Admin sign in</h1>
-        <p className="muted">Use a messaging account with role=admin.</p>
-        <label htmlFor="username">Username</label>
-        <input id="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-        <label htmlFor="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        {error ? <p className="error">{error}</p> : null}
-        <button className="primary" type="submit" disabled={loading}>
-          {loading ? "…" : "Sign in"}
-        </button>
-      </form>
-    </div>
+    <main className={`auth-shell theme-${theme}`}>
+      <div className="top-controls">
+        <ThemeToggle theme={theme} onToggle={onThemeToggle} />
+      </div>
+
+      <section className="auth-card">
+        <BrandLogo className="brand-logo brand-logo--auth" theme={theme} />
+        <h1>Message2 Admin</h1>
+        <p className="auth-card__subtitle">Sign in with a messaging account that has role=admin.</p>
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="input-group">
+            <div className="input-group__head">
+              <label htmlFor="username">Username</label>
+            </div>
+            <input
+              id="username"
+              className="form-control"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              required
+            />
+          </div>
+
+          <div className="input-group">
+            <div className="input-group__head">
+              <label htmlFor="password">Password</label>
+            </div>
+            <input
+              id="password"
+              className="form-control"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </div>
+
+          {error ? <p className="auth-error">{error}</p> : null}
+
+          <button className="primary-button" type="submit" disabled={loading}>
+            {loading ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+      </section>
+    </main>
   );
 }
