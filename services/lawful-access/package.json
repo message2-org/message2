@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test src/index.test.ts"
+    "test": "AUDIT_STORE=memory LAWFUL_MTLS_REQUIRED=false LAWFUL_API_SHARED_SECRET=test-lawful-secret INTERNAL_SERVICE_SECRET=test-internal DEPLOYMENT_PROFILE=public LAWFUL_ACCESS_ENABLED=true JWT_SECRET=test-jwt-secret node --import tsx --test src/index.test.ts"
   },
   "dependencies": {
     "@message2/contracts": "workspace:*",

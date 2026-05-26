@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test src/index.test.ts src/siem-export.test.ts",
+    "test": "AUDIT_STORE=memory JWT_SECRET=test-jwt-secret INTERNAL_SERVICE_SECRET=test-internal-secret node --import tsx --test src/index.test.ts src/siem-export.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy"
