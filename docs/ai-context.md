@@ -85,6 +85,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `fix-ci-develop-green` | `done` | `cursor:ci-develop-green` | `2026-05-26` | monorepo CI + docs merge policy | `fix/ci-develop-green` | PR #4 merged; `develop` CI green |
 | `web-auth-interactive-states` | `done` | `cursor:auth-hover` | `2026-05-26` | `apps/web/src/index.css` AuthPage hover/active | `feature/web-auth-interactive-states` | PR #6 merged |
 | `track-c-e2ee-web-wire` | `done` | `cursor:track-c-e2ee` | `2026-05-26` | `packages/contracts`, `services/messaging`, `apps/web` | `feature/track-c-e2ee-web-wire` | PR #5 merged |
+| `track-b-web-session-restore` | `in_progress` | `cursor:web-session-restore` | `2026-05-26` | `apps/web/src/auth` | `feature/track-b-web-session-restore` | PR #3 |
 
 ### Planned next (pick one track for new agents)
 
@@ -100,7 +101,8 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - [x] Message edit / delete / reply / react (API + web)
 - [x] Read receipts, typing, presence (WS + UI; DM online/offline + read ticks)
 - [x] Real push via `notifications` (Web Push + FCM legacy API; dry-run without keys)
-- [ ] Web messenger polish: session restore edge cases, media UX, deployment-profile auth UX as needed
+- [x] Web session restore after reload (`apps/web/src/auth`)
+- [ ] Web messenger polish: media UX, deployment-profile auth UX as needed
 
 **Track B-admin — Operator console (`apps/admin`)**
 
@@ -144,6 +146,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-25: Multi-agent coordination — claims table + `feature/<task_id>` + PR (`docs/ops/agent-coordination.md`, `.cursor/rules/agent-coordination.mdc`).
 - 2026-05-25: Client platform order documented — web v1 → push → Android → Tauri desktop → iOS (`docs/product/client-platform-roadmap.md`).
 - 2026-05-05: `pnpm dev:web` without Docker; full stack needs `pnpm infra:up` or `pnpm dev:full`.
+- 2026-05-26: Web session restore — `apps/web/src/auth` (optimistic hydrate, refresh rotation, keep session on network errors); PR #3.
 - 2026-05-26: Admin install wizard — corporate connectivity cards, env snippets, drift vs `GET /instance/profile` (`apps/admin`); PR #2 → `develop`.
 - 2026-05-26: Green CI policy documented; PR #4 — TS/Prisma fixes, CI workflow `prisma:generate`, `develop` build/test green.
 - 2026-05-26: AuthPage hover/active affordances (inputs, avatar, language, theme, submit) — `apps/web/src/index.css`; PR #6 → `develop`.
