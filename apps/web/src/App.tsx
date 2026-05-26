@@ -1,4 +1,9 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { API_BASE_URLS, fetchRefresh, UNAUTHORIZED_ERROR } from "./auth/api";
+import { getBootAuthState, restoreSession } from "./auth/restoreSession";
+import type { RestoreSessionResult } from "./auth/restoreSession";
+import { clearStoredSession, saveStoredSession } from "./auth/storage";
+import type { StoredSession } from "./auth/types";
 import { copy, Locale, preloadLocaleFlags } from "./i18n";
 import { AuthPage } from "./pages/AuthPage";
 import { ChatPage } from "./pages/ChatPage";
@@ -26,7 +31,6 @@ import {
   TransparencyDetailResponse
 } from "./types";
 
-const API_BASE_URLS = ["/messaging", "http://localhost:4000/messaging", "http://localhost:4001"] as const;
 const USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
 const PASSWORD_HAS_LOWER = /[a-z]/;
 const PASSWORD_HAS_UPPER = /[A-Z]/;
@@ -35,11 +39,6 @@ const PASSWORD_HAS_SPECIAL = /[^A-Za-z0-9]/;
 
 type Copy = (typeof copy)["ru"];
 type AuthApiResponse = AuthUser & { accessToken: string; refreshToken: string };
-type StoredSession = {
-  user: AuthUser;
-  accessToken: string;
-  refreshToken: string;
-};
 type MessagePreviewMeta = Pick<Message, "preview" | "previewType" | "fileName">;
 type ChatApiResponseItem = {
   id: string;
@@ -102,9 +101,6 @@ type ProfileUpdatePayload = {
   newPassword: string;
   avatarUrl?: string | null;
 };
-const SESSION_STORAGE_KEY = "message2.auth.session.v1";
-const UNAUTHORIZED_ERROR = "UNAUTHORIZED";
-
 function getDisplayNameFieldError(
   trimmed: string,
   authMode: AuthMode,
@@ -136,27 +132,6 @@ function getPasswordFieldError(trimmed: string, attempted: boolean, showMinLengt
   if (!PASSWORD_HAS_DIGIT.test(trimmed)) return t.validationPasswordNeedDigit;
   if (!PASSWORD_HAS_SPECIAL.test(trimmed)) return t.validationPasswordNeedSpecial;
   return undefined;
-}
-
-function readStoredSession(): StoredSession | null {
-  try {
-    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<StoredSession>;
-    if (!parsed.user || !parsed.accessToken || !parsed.refreshToken) return null;
-    if (!parsed.user.id || !parsed.user.displayName || !parsed.user.username) return null;
-    return { user: parsed.user, accessToken: parsed.accessToken, refreshToken: parsed.refreshToken };
-  } catch {
-    return null;
-  }
-}
-
-function saveStoredSession(session: StoredSession) {
-  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-}
-
-function clearStoredSession() {
-  localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
 function translateAuthBackendMessage(message: string, locale: Locale): string {
@@ -226,32 +201,6 @@ async function requestAuth(
     }
   }
   throw lastError ?? new Error("Auth request failed");
-}
-
-async function requestRefresh(refreshToken: string) {
-  for (const baseUrl of API_BASE_URLS) {
-    const response = await fetch(`${baseUrl}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken })
-    });
-    if (!response.ok) continue;
-    const data = (await response.json()) as { accessToken: string; refreshToken: string };
-    if (data.accessToken && data.refreshToken) return data;
-  }
-  throw new Error("Refresh request failed");
-}
-
-async function requestMe(accessToken: string) {
-  for (const baseUrl of API_BASE_URLS) {
-    const response = await fetch(`${baseUrl}/auth/me`, {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-    if (!response.ok) continue;
-    const data = (await response.json()) as AuthUser;
-    if (data.id && data.username && data.displayName) return data;
-  }
-  throw new Error("Failed to load profile");
 }
 
 async function requestWithAuth(path: string, accessToken: string, init?: RequestInit) {
@@ -475,11 +424,13 @@ function wsCandidates(accessToken: string) {
   });
 }
 
+const bootAuth = getBootAuthState();
+
 export default function App() {
   const [locale, setLocale] = useState<Locale>("ru");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(bootAuth.authUser);
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -544,8 +495,8 @@ export default function App() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [typingByChat, setTypingByChat] = useState<Record<string, { userId: string; displayName: string }[]>>({});
   const [accountPassword, setAccountPassword] = useState("");
-  const [session, setSession] = useState<StoredSession | null>(null);
-  const [isRestoringSession, setIsRestoringSession] = useState(true);
+  const [session, setSession] = useState<StoredSession | null>(bootAuth.session);
+  const [isRestoringSession, setIsRestoringSession] = useState(bootAuth.shouldRestore);
   const t = copy[locale];
   const userAvatarDisplay = useResolvedAvatarUrl(userAvatar, session?.accessToken ?? null);
   const activeChatIdRef = useRef<string | null>(null);
@@ -796,39 +747,20 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      const storedSession = readStoredSession();
-      if (!storedSession) {
-        if (mounted) setIsRestoringSession(false);
-        return;
+    if (!bootAuth.shouldRestore) return;
+    void restoreSession().then((result: RestoreSessionResult) => {
+      if (!mounted) return;
+      if (result.status === "restored") {
+        setAuthUser(result.session.user);
+        setUserAvatar(result.session.user.avatarUrl ?? null);
+        setSession(result.session);
+      } else if (result.status === "cleared") {
+        setAuthUser(null);
+        setSession(null);
+        setUserAvatar(null);
       }
-
-      try {
-        const user = await requestMe(storedSession.accessToken);
-        if (!mounted) return;
-        setAuthUser(user);
-        setUserAvatar(user.avatarUrl ?? null);
-        const nextSession = { ...storedSession, user };
-        setSession(nextSession);
-        saveStoredSession(nextSession);
-      } catch {
-        try {
-          const refreshed = await requestRefresh(storedSession.refreshToken);
-          const user = await requestMe(refreshed.accessToken);
-          if (!mounted) return;
-          setAuthUser(user);
-          setUserAvatar(user.avatarUrl ?? null);
-          const nextSession = { user, accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken };
-          setSession(nextSession);
-          saveStoredSession(nextSession);
-        } catch {
-          setSession(null);
-          clearStoredSession();
-        }
-      } finally {
-        if (mounted) setIsRestoringSession(false);
-      }
-    })();
+      setIsRestoringSession(false);
+    });
     return () => {
       mounted = false;
     };
@@ -876,7 +808,7 @@ export default function App() {
       return await operation(session.accessToken);
     } catch (error) {
       if (!(error instanceof Error) || error.message !== UNAUTHORIZED_ERROR) throw error;
-      const refreshed = await requestRefresh(session.refreshToken);
+      const refreshed = await fetchRefresh(session.refreshToken);
       const nextSession = { ...session, accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken };
       setSession(nextSession);
       saveStoredSession(nextSession);
@@ -1441,7 +1373,7 @@ export default function App() {
     }
   };
 
-  if (isRestoringSession) {
+  if (isRestoringSession && !authUser) {
     return null;
   }
 
