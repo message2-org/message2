@@ -15,7 +15,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
 - Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
-- **Git:** default branch **`develop`** (GitHub) @ `de5a04e`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`. **CI on `develop` is green** (workflow: `pnpm install` → Prisma generate for access-audit, notifications, messaging → `pnpm build` → `pnpm test`).
+- **Git:** default branch **`develop`** (GitHub) @ `ab38a34`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`. **CI on `develop` is green** (workflow: `pnpm install` → Prisma generate for access-audit, notifications, messaging → `pnpm build` → `pnpm test`).
 - **Integration:** merge to `develop` only after **green CI** on the PR (see `docs/ops/agent-coordination.md`, `docs/product/requirements.md`).
 - Current local run mode:
   - `pnpm install`
@@ -74,6 +74,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - [x] CI on `develop`: monorepo `pnpm build` + `pnpm test` green; isolated Prisma clients; workflow `prisma:generate` steps (PR #4).
 - [x] Track C: DM E2EE web wire (`e2ee_strict` text DMs, prekeys API, Double Ratchet); PR #5.
 - [x] Track C: media E2EE for web DM (`e2ee_strict` attachment envelope + client decrypt); PR #7.
+- [x] Repo hygiene: untrack committed `node_modules` / Vite cache paths (87 files); PR #8.
 
 ### Active work (claims) — multi-agent
 
@@ -88,7 +89,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `track-c-e2ee-web-wire` | `done` | `cursor:track-c-e2ee` | `2026-05-26` | `packages/contracts`, `services/messaging`, `apps/web` | `feature/track-c-e2ee-web-wire` | PR #5 merged |
 | `track-b-web-session-restore` | `done` | `cursor:web-session-restore` | `2026-05-26` | `apps/web/src/auth` | `feature/track-b-web-session-restore` | PR #3 merged |
 | `track-c-e2ee-media-wire` | `done` | `cursor:track-c-e2ee-media` | `2026-05-26` | `apps/web/src/e2ee`, `services/media`, `packages/contracts` | `feature/track-c-e2ee-media-wire` | PR #7 merged |
-| `chore-untrack-node-modules` | `in_progress` | `cursor:chore-untrack-node-modules` | `2026-05-26` | repo git index | `feature/chore-untrack-node-modules` | stop tracking committed `node_modules` |
+| `chore-untrack-node-modules` | `done` | `cursor:chore-untrack-node-modules` | `2026-05-26` | repo git index | `feature/chore-untrack-node-modules` | PR #8 merged; `git ls-files -ci` empty |
 
 ### Planned next (pick one track for new agents)
 
@@ -155,6 +156,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-26: AuthPage hover/active affordances (inputs, avatar, language, theme, submit) — `apps/web/src/index.css`; PR #6 → `develop`.
 - 2026-05-26: Track C — DM E2EE prekeys API + web Double Ratchet wire (`e2ee_strict` text DMs); migration `20260526120000_e2ee_prekeys`; PR #5 → `develop`.
 - 2026-05-26: Track C — web media E2EE for DM in `e2ee_strict` (encrypted blob upload + client decrypt); PR #7 → `develop`.
+- 2026-05-26: Untrack 87 `node_modules` paths committed by mistake (`apps/web`, services); PR #8 → `develop` @ `ab38a34`.
 
 ## 6) Handoff for new Cursor / cloud agents
 
