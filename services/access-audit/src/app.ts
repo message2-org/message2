@@ -27,6 +27,12 @@ import { forwardToSiemWebhook } from "./siem-forward.js";
 
 type AuthPayload = { sub: string; role?: string };
 
+function routeParam(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value[0];
+  return undefined;
+}
+
 export type AccessAuditApp = express.Express;
 
 const readBearerPayload = (req: express.Request): AuthPayload | null => {
@@ -168,7 +174,12 @@ export const createAccessAuditApp = (): AccessAuditApp => {
   });
 
   app.get("/internal/transparency/:eventId", requireInternalSecret, async (req, res) => {
-    const event = await getPublicTransparencyEvent(req.params.eventId);
+    const eventId = routeParam(req.params.eventId);
+    if (!eventId) {
+      res.status(400).json({ error: "invalid_event_id" });
+      return;
+    }
+    const event = await getPublicTransparencyEvent(eventId);
     if (!event) {
       res.status(404).json({ error: "event_not_found" });
       return;
@@ -246,7 +257,12 @@ export const createAccessAuditApp = (): AccessAuditApp => {
         res.status(400).json({ error: "status_required" });
         return;
       }
-      const updated = await updateComplaintStatus(req.params.id, body.status, body.outcomeSummary);
+      const complaintId = routeParam(req.params.id);
+      if (!complaintId) {
+        res.status(400).json({ error: "invalid_complaint_id" });
+        return;
+      }
+      const updated = await updateComplaintStatus(complaintId, body.status, body.outcomeSummary);
       if (!updated) {
         res.status(404).json({ error: "not_found" });
         return;
@@ -259,7 +275,12 @@ export const createAccessAuditApp = (): AccessAuditApp => {
   });
 
   app.get("/transparency/events/:eventId", requireUserAuth, requireUserTransparencyFeature, async (req, res) => {
-    const event = await getPublicTransparencyEvent(req.params.eventId);
+    const eventId = routeParam(req.params.eventId);
+    if (!eventId) {
+      res.status(400).json({ error: "invalid_event_id" });
+      return;
+    }
+    const event = await getPublicTransparencyEvent(eventId);
     if (!event) {
       res.status(404).json({ error: "event_not_found" });
       return;

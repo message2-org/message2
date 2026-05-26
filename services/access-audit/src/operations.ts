@@ -1,6 +1,6 @@
 import type { PrivilegedOperationRequest, TransparencyEventV1 } from "@message2/contracts";
 import { config } from "./config.js";
-import { appendTransparencyEvent, DuplicateLegalRefError } from "./store.js";
+import { appendTransparencyEvent, DuplicateLegalRefError } from "./store/index.js";
 
 export { DuplicateLegalRefError };
 

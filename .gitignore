@@ -4,6 +4,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+**/src/generated/
 *.tsbuildinfo
 
 # Local environment (examples stay tracked)

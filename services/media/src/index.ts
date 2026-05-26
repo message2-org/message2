@@ -13,6 +13,12 @@ app.use(helmet());
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 const jwtSecret = process.env.JWT_SECRET ?? "change-me-in-production";
+function routeParam(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value[0];
+  return undefined;
+}
+
 const allowedMimeTypes = new Set([
   "image/jpeg",
   "image/png",
@@ -89,7 +95,12 @@ app.get("/objects/:mediaId", auth, async (req, res) => {
     res.status(503).json({ error: "object storage unavailable" });
     return;
   }
-  const meta = await getMediaMeta(req.params.mediaId);
+  const mediaId = routeParam(req.params.mediaId);
+  if (!mediaId) {
+    res.status(400).json({ error: "invalid media id" });
+    return;
+  }
+  const meta = await getMediaMeta(mediaId);
   if (!meta) {
     res.status(404).json({ error: "media not found" });
     return;
@@ -108,7 +119,12 @@ app.get("/objects/:mediaId/content", auth, async (req, res) => {
     res.status(503).json({ error: "object storage unavailable" });
     return;
   }
-  const payload = await getMediaStream(req.params.mediaId);
+  const mediaId = routeParam(req.params.mediaId);
+  if (!mediaId) {
+    res.status(400).json({ error: "invalid media id" });
+    return;
+  }
+  const payload = await getMediaStream(mediaId);
   if (!payload) {
     res.status(404).json({ error: "media not found" });
     return;

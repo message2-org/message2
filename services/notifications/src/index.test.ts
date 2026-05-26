@@ -2,13 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import jwt from "jsonwebtoken";
-import { createApp, resetPushStoreForTests } from "./app.js";
-import { dispatchMessagePush } from "./dispatch.js";
 
 process.env.PUSH_STORE = "memory";
 process.env.PUSH_DRY_RUN = "true";
 process.env.JWT_SECRET = "test-jwt-secret";
 process.env.INTERNAL_SERVICE_SECRET = "internal-test-secret";
+
+const { createApp, resetPushStoreForTests } = await import("./app.js");
+const { dispatchMessagePush } = await import("./dispatch.js");
 
 const listen = (app: ReturnType<typeof createApp>) =>
   new Promise<{ server: Server; base: string }>((resolve) => {
