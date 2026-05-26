@@ -1,4 +1,4 @@
-import cors from "cors";
+import cors, { type CorsOptions } from "cors";
 import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import helmet from "helmet";
@@ -13,17 +13,16 @@ export const createGatewayApp = () => {
     instanceProfile;
 
   const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? "").split(",").map((x) => x.trim()).filter(Boolean);
-  app.use(
-    cors({
-      origin: (origin, cb) => {
-        if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-          cb(null, true);
-          return;
-        }
-        cb(new Error("CORS policy denied this origin"));
+  const corsOptions: CorsOptions = {
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
       }
-    })
-  );
+      callback(new Error("CORS policy denied this origin"));
+    }
+  };
+  app.use(cors(corsOptions));
   app.use(helmet());
   app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   app.set("trust proxy", 1);
@@ -53,7 +52,8 @@ export const createGatewayApp = () => {
     pathRewrite: { "^/messaging": "" },
     on: {
       proxyReq: (proxyReq, req) => {
-        const requestId = req.header("x-request-id");
+        const raw = req.headers["x-request-id"];
+        const requestId = Array.isArray(raw) ? raw[0] : raw;
         if (requestId) {
           proxyReq.setHeader("x-request-id", requestId);
         }

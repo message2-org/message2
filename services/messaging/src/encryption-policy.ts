@@ -5,6 +5,7 @@ import {
   isEncryptionDowngrade,
   isEncryptionMode,
   isValidInstancePolicyShape,
+  isWithinEncryptionBounds,
   resolveEffectiveEncryptionMode,
   type EncryptionMode,
   type InstanceEncryptionPolicy

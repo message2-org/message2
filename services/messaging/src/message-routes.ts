@@ -10,6 +10,12 @@ type AuthRequest = express.Request & { auth?: AuthPayload };
 
 const EMOJI_RE = /^[\p{Extended_Pictographic}\u{FE0F}\u{200D}]{1,8}$/u;
 
+function routeParam(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value[0];
+  return undefined;
+}
+
 type Deps = {
   prisma: PrismaClient;
   auth: (req: AuthRequest, res: express.Response, next: express.NextFunction) => void;
@@ -20,7 +26,11 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
   const { prisma, auth, isChatMember } = deps;
 
   app.get("/chats/:chatId/messages", auth, async (req: AuthRequest, res) => {
-    const chatId = req.params.chatId;
+    const chatId = routeParam(req.params.chatId);
+    if (!chatId) {
+      res.status(400).json({ error: "invalid_chat_id" });
+      return;
+    }
     const viewerId = req.auth!.sub;
     if (!(await isChatMember(chatId, viewerId))) {
       res.status(403).json({ error: "chat access denied" });
@@ -96,7 +106,11 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
   });
 
   app.post("/chats/:chatId/messages", auth, async (req: AuthRequest, res) => {
-    const chatId = req.params.chatId;
+    const chatId = routeParam(req.params.chatId);
+    if (!chatId) {
+      res.status(400).json({ error: "invalid_chat_id" });
+      return;
+    }
     const senderId = req.auth!.sub;
     if (!(await isChatMember(chatId, senderId))) {
       res.status(403).json({ error: "chat access denied" });
@@ -143,7 +157,12 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
   });
 
   app.patch("/chats/:chatId/messages/:messageId", auth, async (req: AuthRequest, res) => {
-    const { chatId, messageId } = req.params;
+    const chatId = routeParam(req.params.chatId);
+    const messageId = routeParam(req.params.messageId);
+    if (!chatId || !messageId) {
+      res.status(400).json({ error: "invalid_route_params" });
+      return;
+    }
     const userId = req.auth!.sub;
     if (!(await isChatMember(chatId, userId))) {
       res.status(403).json({ error: "chat access denied" });
@@ -178,7 +197,12 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
   });
 
   app.delete("/chats/:chatId/messages/:messageId", auth, async (req: AuthRequest, res) => {
-    const { chatId, messageId } = req.params;
+    const chatId = routeParam(req.params.chatId);
+    const messageId = routeParam(req.params.messageId);
+    if (!chatId || !messageId) {
+      res.status(400).json({ error: "invalid_route_params" });
+      return;
+    }
     const userId = req.auth!.sub;
     if (!(await isChatMember(chatId, userId))) {
       res.status(403).json({ error: "chat access denied" });
@@ -207,7 +231,12 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
   });
 
   app.put("/chats/:chatId/messages/:messageId/reactions", auth, async (req: AuthRequest, res) => {
-    const { chatId, messageId } = req.params;
+    const chatId = routeParam(req.params.chatId);
+    const messageId = routeParam(req.params.messageId);
+    if (!chatId || !messageId) {
+      res.status(400).json({ error: "invalid_route_params" });
+      return;
+    }
     const userId = req.auth!.sub;
     if (!(await isChatMember(chatId, userId))) {
       res.status(403).json({ error: "chat access denied" });
@@ -254,7 +283,11 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
   });
 
   app.post("/chats/:chatId/read", auth, async (req: AuthRequest, res) => {
-    const chatId = req.params.chatId;
+    const chatId = routeParam(req.params.chatId);
+    if (!chatId) {
+      res.status(400).json({ error: "invalid_chat_id" });
+      return;
+    }
     const userId = req.auth!.sub;
     if (!(await isChatMember(chatId, userId))) {
       res.status(403).json({ error: "chat access denied" });
@@ -276,7 +309,11 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
   });
 
   app.post("/chats/:chatId/typing", auth, async (req: AuthRequest, res) => {
-    const chatId = req.params.chatId;
+    const chatId = routeParam(req.params.chatId);
+    if (!chatId) {
+      res.status(400).json({ error: "invalid_chat_id" });
+      return;
+    }
     const userId = req.auth!.sub;
     if (!(await isChatMember(chatId, userId))) {
       res.status(403).json({ error: "chat access denied" });

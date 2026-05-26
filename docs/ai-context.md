@@ -30,6 +30,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
   - optional: `displayName`
   - `email` is not mandatory by default.
 - **Messenger v1 (Track B):** edit/delete/reply/react; read/typing/presence WS; Web Push + FCM register/dispatch in `notifications`; messaging fires push on new message.
+- **E2EE DM (Track C):** `packages/contracts/src/e2ee`, messaging prekey API (`/e2ee/...`), `apps/web/src/crypto` + `e2ee/dm-wire.ts` + `App.tsx` wire when chat `effectiveMode` is `e2ee_strict` (text DMs; attachments legacy JSON).
 - **Lawful access (implemented P0–P6 MVP):**
   - `packages/contracts`: validation, `lawfulApiBodyToOperation`, `Complaint` types
   - `access-audit`: privileged/internal routes; Postgres audit + `complaints`; SIEM export/forward; admin queue API
@@ -75,7 +76,8 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | task_id | status | owner | since | scope | branch | notes |
 |---------|--------|-------|-------|-------|--------|-------|
 | `web-auth-register-avatar-placeholder` | `done` | `cursor:web-auth-avatar` | `2026-05-26` | `apps/web` AuthPage register avatar | `feature/web-auth-register-avatar-placeholder` | PR #1 merged |
-| `admin-install-wizard-connectivity` | `done` | `cursor:admin-install-wizard` | `2026-05-26` | `apps/admin` | `feature/admin-install-wizard-connectivity` | PR pending |
+| `admin-install-wizard-connectivity` | `done` | `cursor:admin-install-wizard` | `2026-05-26` | `apps/admin` | `feature/admin-install-wizard-connectivity` | PR #2 merged |
+| `track-c-e2ee-web-wire` | `in_progress` | `cursor:track-c-e2ee` | `2026-05-26` | `packages/contracts`, `services/messaging`, `apps/web` | `feature/track-c-e2ee-web-wire` | PR open |
 
 ### Planned next (pick one track for new agents)
 
@@ -102,7 +104,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 **Track C — Security / product**
 
 - [ ] Client-side encryption for message media blobs (E2E)
-- [ ] Double Ratchet E2EE (full protocol — see `e2ee-design.md`)
+- [x] Double Ratchet E2EE for DM web (`e2ee_strict`: prekeys API, `apps/web/src/crypto`, `App.tsx`); media E2EE + Android ⬜
 - [ ] Define deployment-profile auth policy matrix (public vs corporate)
 - [ ] Harden session/token lifecycle (refresh rotation exists; production policy)
 - [ ] Refine registration UX (`displayName` optional, clear labels)
@@ -136,6 +138,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-25: Client platform order documented — web v1 → push → Android → Tauri desktop → iOS (`docs/product/client-platform-roadmap.md`).
 - 2026-05-05: `pnpm dev:web` without Docker; full stack needs `pnpm infra:up` or `pnpm dev:full`.
 - 2026-05-26: Admin install wizard — corporate connectivity cards, env snippets, drift vs `GET /instance/profile` (`apps/admin`).
+- 2026-05-26: Track C — DM E2EE prekeys API + web Double Ratchet wire (`e2ee_strict` text DMs); migration `20260526120000_e2ee_prekeys`.
 
 ## 6) Handoff for new Cursor / cloud agents
 

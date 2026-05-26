@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs";
 import argon2 from "argon2";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
-import jwt from "jsonwebtoken";
+import jwt, { type SignOptions } from "jsonwebtoken";
 import { PrismaClient, type User } from "@prisma/client";
 import { loadMasterKeys } from "./key-provider.js";
 import {
@@ -23,6 +23,7 @@ import { applyTransparencyEvent, type TransparencyIngressPayload } from "./trans
 import { instanceConfig } from "./instance-config.js";
 import { requireUserTransparency } from "./profile-guards.js";
 import { registerEncryptionRoutes } from "./encryption-routes.js";
+import { registerE2eeRoutes } from "./e2ee-routes.js";
 import { ensureInstanceEncryptionPolicy } from "./encryption-policy.js";
 
 process.loadEnvFile?.();
@@ -91,11 +92,19 @@ const auth = (req: AuthRequest, res: express.Response, next: express.NextFunctio
   }
 };
 
+function routeParam(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value[0];
+  return undefined;
+}
+
 const toAuthRole = (role: User["role"]): "user" | "admin" => (role === "admin" ? "admin" : "user");
+const accessSignOptions: SignOptions = { expiresIn: accessTokenTtl as SignOptions["expiresIn"] };
+const refreshSignOptions: SignOptions = { expiresIn: refreshTokenTtl as SignOptions["expiresIn"] };
 const issueAccessToken = (user: User) =>
-  jwt.sign({ sub: user.id, role: toAuthRole(user.role) }, jwtSecret, { expiresIn: accessTokenTtl });
+  jwt.sign({ sub: user.id, role: toAuthRole(user.role) }, jwtSecret, accessSignOptions);
 const issueRefreshToken = (user: User) =>
-  jwt.sign({ sub: user.id, role: toAuthRole(user.role), typ: "refresh" }, jwtSecret, { expiresIn: refreshTokenTtl });
+  jwt.sign({ sub: user.id, role: toAuthRole(user.role), typ: "refresh" }, jwtSecret, refreshSignOptions);
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 type WrappedEncryptedValue = {
@@ -804,6 +813,7 @@ app.get("/instance/profile", async (_req, res) => {
 });
 
 registerEncryptionRoutes({ app, prisma, auth, requireAdmin });
+registerE2eeRoutes({ app, prisma, auth });
 
 app.post("/chats", auth, async (req: AuthRequest, res) => {
   try {
@@ -1040,7 +1050,11 @@ app.get("/transparency/notices", auth, requireUserTransparency, async (req: Auth
 });
 
 app.get("/transparency/notices/:eventId", auth, requireUserTransparency, async (req: AuthRequest, res) => {
-  const eventId = req.params.eventId;
+  const eventId = routeParam(req.params.eventId);
+  if (!eventId) {
+    res.status(400).json({ error: "invalid_event_id" });
+    return;
+  }
   const notice = await prisma.transparencyUserNotice.findFirst({
     where: { userId: req.auth!.sub, eventId }
   });
