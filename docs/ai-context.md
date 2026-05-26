@@ -81,6 +81,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `web-auth-register-avatar-placeholder` | `done` | `cursor:web-auth-avatar` | `2026-05-26` | `apps/web` AuthPage register avatar | `feature/web-auth-register-avatar-placeholder` | PR #1 merged |
 | `admin-install-wizard-connectivity` | `done` | `cursor:admin-install-wizard` | `2026-05-26` | `apps/admin` | `feature/admin-install-wizard-connectivity` | PR #2 merged |
 | `fix-ci-develop-green` | `done` | `cursor:ci-develop-green` | `2026-05-26` | monorepo CI + docs merge policy | `fix/ci-develop-green` | PR #4 merged; `develop` CI green |
+| `web-auth-interactive-states` | `in_progress` | `cursor:auth-hover` | `2026-05-26` | `apps/web/src/index.css` AuthPage hover/active | `feature/web-auth-interactive-states` | PR open |
 
 ### Planned next (pick one track for new agents)
 
