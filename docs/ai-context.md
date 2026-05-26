@@ -74,7 +74,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 
 | task_id | status | owner | since | scope | branch | notes |
 |---------|--------|-------|-------|-------|--------|-------|
-| `web-auth-register-avatar-placeholder` | `in_progress` | `cursor:web-auth-avatar` | `2026-05-26` | `apps/web` AuthPage register avatar | `feature/web-auth-register-avatar-placeholder` | PR open — neutral camera placeholder |
+| `web-auth-register-avatar-placeholder` | `done` | `cursor:web-auth-avatar` | `2026-05-26` | `apps/web` AuthPage register avatar | `feature/web-auth-register-avatar-placeholder` | PR #1 merged |
 
 ### Planned next (pick one track for new agents)
 
