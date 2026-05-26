@@ -15,7 +15,8 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
 - Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
-- **Git:** default branch **`develop`** (GitHub) @ `a2e8848`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`.
+- **Git:** default branch **`develop`** (GitHub) @ `9a96c3b`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`. **CI on `develop` is green** (workflow: `pnpm install` → Prisma generate for access-audit, notifications, messaging → `pnpm build` → `pnpm test`).
+- **Integration:** merge to `develop` only after **green CI** on the PR (see `docs/ops/agent-coordination.md`, `docs/product/requirements.md`).
 - Current local run mode:
   - `pnpm install`
   - Infra (PostgreSQL/Redis/MinIO): `pnpm infra:up` / `pnpm infra:down`
@@ -40,6 +41,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
   - Compliance runbooks: `docs/ops/compliance/`
   - Encryption: `metadata_only` | `server_encrypted` | `e2ee_strict`; DM downgrade needs peer consent
   - Env: `INTERNAL_SERVICE_SECRET` aligned across messaging, access-audit, lawful-access
+- **Build notes:** `apps/web` CI uses `vite build` (`pnpm typecheck` optional for strict `tsc`). `access-audit` and `notifications` use Prisma clients under `src/generated/prisma` (not shared `@prisma/client` with messaging).
 
 ## 3) Architecture/Policy Intent (Mutable)
 
@@ -67,6 +69,8 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - [x] Lawful access **P5:** encryption modes in contracts/DB; admin policy UI; DM downgrade consent in web.
 - [x] Lawful access **P6:** SIEM NDJSON/CEF export, webhook forward, compliance runbooks.
 - [x] Track B: message edit/delete/reply/react; read/typing/presence WS; Web Push + FCM dispatch; discovery v2 placeholder.
+- [x] Admin install wizard: corporate connectivity cards, env snippets, drift vs `GET /instance/profile` (PR #2).
+- [x] CI on `develop`: monorepo `pnpm build` + `pnpm test` green; isolated Prisma clients; workflow `prisma:generate` steps (PR #4).
 
 ### Active work (claims) — multi-agent
 
@@ -75,7 +79,8 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | task_id | status | owner | since | scope | branch | notes |
 |---------|--------|-------|-------|-------|--------|-------|
 | `web-auth-register-avatar-placeholder` | `done` | `cursor:web-auth-avatar` | `2026-05-26` | `apps/web` AuthPage register avatar | `feature/web-auth-register-avatar-placeholder` | PR #1 merged |
-| `admin-install-wizard-connectivity` | `done` | `cursor:admin-install-wizard` | `2026-05-26` | `apps/admin` | `feature/admin-install-wizard-connectivity` | PR pending |
+| `admin-install-wizard-connectivity` | `done` | `cursor:admin-install-wizard` | `2026-05-26` | `apps/admin` | `feature/admin-install-wizard-connectivity` | PR #2 merged |
+| `fix-ci-develop-green` | `done` | `cursor:ci-develop-green` | `2026-05-26` | monorepo CI + docs merge policy | `fix/ci-develop-green` | PR #4 merged; `develop` CI green |
 
 ### Planned next (pick one track for new agents)
 
@@ -135,7 +140,8 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-25: Multi-agent coordination — claims table + `feature/<task_id>` + PR (`docs/ops/agent-coordination.md`, `.cursor/rules/agent-coordination.mdc`).
 - 2026-05-25: Client platform order documented — web v1 → push → Android → Tauri desktop → iOS (`docs/product/client-platform-roadmap.md`).
 - 2026-05-05: `pnpm dev:web` without Docker; full stack needs `pnpm infra:up` or `pnpm dev:full`.
-- 2026-05-26: Admin install wizard — corporate connectivity cards, env snippets, drift vs `GET /instance/profile` (`apps/admin`).
+- 2026-05-26: Admin install wizard — corporate connectivity cards, env snippets, drift vs `GET /instance/profile` (`apps/admin`); PR #2 → `develop`.
+- 2026-05-26: Green CI policy documented; PR #4 — TS/Prisma fixes, CI workflow `prisma:generate`, `develop` build/test green.
 
 ## 6) Handoff for new Cursor / cloud agents
 
@@ -148,7 +154,7 @@ Derive task_id + scope, show me, claim if free, branch feature/<task_id>, then w
 If task_id already in_progress by another agent: stop and report.
 Default next: Track D Android (push done). See docs/product/client-platform-roadmap.md.
 Git: PR/feature branches → develop only; do not merge to main without user release request.
-On finish: pull develop, test, PR→develop; release claim; update §2–5. Do not change section 1.
+On finish: pull develop, test, PR→develop only with green CI; release claim; update §2–5. Do not change section 1.
 ```
 
 **Source of truth:** git + files above — not prior chat transcripts.
