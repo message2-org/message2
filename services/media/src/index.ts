@@ -29,7 +29,8 @@ const allowedMimeTypes = new Set([
   "audio/mpeg",
   "audio/mp4",
   "audio/webm",
-  "application/pdf"
+  "application/pdf",
+  "application/octet-stream"
 ]);
 
 let storageReady = false;

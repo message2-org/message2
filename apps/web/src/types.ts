@@ -57,6 +57,13 @@ export type Message = {
   preview?: string;
   previewType?: "image" | "video" | "audio" | "file";
   fileName?: string;
+  mediaE2ee?: {
+    alg: "aes-256-gcm";
+    keyB64: string;
+    ivB64: string;
+    mime: string;
+    size: number;
+  };
   disclosure?: MessageDisclosure;
   isTombstone?: boolean;
   tombstoneLabel?: string;
@@ -111,4 +118,13 @@ export type PendingAttachment = {
   type: "image" | "video" | "audio" | "file";
   name: string;
   localPreview: string;
+  mime: string;
+  size: number;
+  mediaE2ee?: {
+    alg: "aes-256-gcm";
+    keyB64: string;
+    ivB64: string;
+    mime: string;
+    size: number;
+  };
 };

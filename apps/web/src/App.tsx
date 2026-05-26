@@ -8,7 +8,7 @@ import { copy, Locale, preloadLocaleFlags } from "./i18n";
 import { AuthPage } from "./pages/AuthPage";
 import { ChatPage } from "./pages/ChatPage";
 import { uploadAvatarMediaRef } from "./lib/avatar";
-import { fetchMediaBlobUrl, uploadMediaFile } from "./lib/media";
+import { fetchMediaBlob, uploadMediaFile } from "./lib/media";
 import { registerWebPush } from "./lib/push";
 import { useResolvedAvatarUrl } from "./hooks/useResolvedAvatarUrl";
 import { TransparencyDetailModal } from "./components/TransparencyDetailModal";
@@ -21,6 +21,7 @@ import {
   prepareOutgoingCipherTexts,
   shouldUseDmE2ee
 } from "./e2ee/dm-wire.js";
+import { decryptAttachmentBlob, encryptAttachmentFile } from "./e2ee/media-wire.js";
 import {
   AuthMode,
   AuthUser,
@@ -80,6 +81,13 @@ type AttachmentPayload = {
   preview?: string;
   previewType: "image" | "video" | "audio" | "file";
   fileName?: string;
+  mediaE2ee?: {
+    alg: "aes-256-gcm";
+    keyB64: string;
+    ivB64: string;
+    mime: string;
+    size: number;
+  };
 };
 
 function inferPreviewTypeFromDataUrl(value: string): "image" | "video" | "audio" | "file" | null {
@@ -555,7 +563,23 @@ export default function App() {
           mediaId: typeof parsed.mediaId === "string" ? parsed.mediaId : undefined,
           preview: typeof parsed.preview === "string" ? parsed.preview : undefined,
           previewType: parsed.previewType,
-          fileName: typeof parsed.fileName === "string" ? parsed.fileName : undefined
+          fileName: typeof parsed.fileName === "string" ? parsed.fileName : undefined,
+          mediaE2ee:
+            parsed.mediaE2ee &&
+            typeof parsed.mediaE2ee === "object" &&
+            parsed.mediaE2ee.alg === "aes-256-gcm" &&
+            typeof parsed.mediaE2ee.keyB64 === "string" &&
+            typeof parsed.mediaE2ee.ivB64 === "string" &&
+            typeof parsed.mediaE2ee.mime === "string" &&
+            typeof parsed.mediaE2ee.size === "number"
+              ? {
+                  alg: "aes-256-gcm",
+                  keyB64: parsed.mediaE2ee.keyB64,
+                  ivB64: parsed.mediaE2ee.ivB64,
+                  mime: parsed.mediaE2ee.mime,
+                  size: parsed.mediaE2ee.size
+                }
+              : undefined
         };
       }
     } catch {
@@ -615,6 +639,7 @@ export default function App() {
       preview: message.isDeleted ? undefined : parsedAttachment?.preview,
       previewType: message.isDeleted ? undefined : parsedAttachment?.previewType,
       fileName: parsedAttachment?.fileName,
+      mediaE2ee: parsedAttachment?.mediaE2ee,
       disclosure: message.disclosure,
       isDeleted: message.isDeleted,
       editedAt: message.editedAt,
@@ -947,12 +972,28 @@ export default function App() {
     }
     if (pendingIds.size === 0) return;
 
+    const envelopeByMediaId: Record<
+      string,
+      { alg: "aes-256-gcm"; keyB64: string; ivB64: string; mime: string; size: number } | undefined
+    > = {};
+    for (const rows of Object.values(messagesByChat)) {
+      for (const message of rows) {
+        if (message.mediaId && message.mediaE2ee && !envelopeByMediaId[message.mediaId]) {
+          envelopeByMediaId[message.mediaId] = message.mediaE2ee;
+        }
+      }
+    }
+
     let cancelled = false;
     void (async () => {
       for (const mediaId of pendingIds) {
         if (cancelled) return;
         try {
-          const blobUrl = await fetchMediaBlobUrl(session.accessToken, mediaId);
+          const encryptedBlob = await fetchMediaBlob(session.accessToken, mediaId);
+          const decryptedBlob = envelopeByMediaId[mediaId]
+            ? await decryptAttachmentBlob(encryptedBlob, envelopeByMediaId[mediaId]!)
+            : encryptedBlob;
+          const blobUrl = URL.createObjectURL(decryptedBlob);
           if (cancelled) {
             URL.revokeObjectURL(blobUrl);
             return;
@@ -1637,12 +1678,20 @@ export default function App() {
               ? "image"
               : "file";
         const localPreview = URL.createObjectURL(file);
-        const uploaded = await runAuthorized((accessToken) => uploadMediaFile(accessToken, file));
+        const chat = activeChatId ? chatsRef.current.find((item) => item.id === activeChatId) : null;
+        const useMediaE2ee = Boolean(chat && shouldUseDmE2ee(chat.kind, chatEncryptionModeRef.current));
+        const uploadable = useMediaE2ee ? await encryptAttachmentFile(file) : null;
+        const uploaded = await runAuthorized((accessToken) =>
+          uploadMediaFile(accessToken, uploadable ? uploadable.encryptedFile : file)
+        );
         return {
           mediaId: uploaded.mediaId,
           type,
           name: uploaded.name,
-          localPreview
+          localPreview,
+          mime: file.type || "application/octet-stream",
+          size: file.size,
+          mediaE2ee: uploadable?.envelope
         };
       }}
       onSendMessage={(attachment) => {
@@ -1655,7 +1704,8 @@ export default function App() {
               text: plainText,
               mediaId: attachment.mediaId,
               previewType: attachment.type,
-              fileName: attachment.name
+              fileName: attachment.name,
+              ...(attachment.mediaE2ee ? { mediaE2ee: attachment.mediaE2ee } : {})
             } satisfies AttachmentPayload)
           : messageText;
         const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1671,6 +1721,7 @@ export default function App() {
           preview: attachment?.localPreview,
           previewType: attachment?.type,
           fileName: attachment?.name,
+          mediaE2ee: attachment?.mediaE2ee,
           ...(replySnapshot
             ? {
                 replyTo: {
@@ -1696,12 +1747,12 @@ export default function App() {
           const chat = chatsRef.current.find((item) => item.id === activeChatId);
           const material = readDeviceKeyMaterial();
           const useE2ee =
-            !attachment &&
             chat?.peerUserId &&
             material &&
             shouldUseDmE2ee(chat.kind, chatEncryptionModeRef.current);
           if (useE2ee && chat?.peerUserId && material) {
             const stored = readDmSession(activeChatId);
+            const e2eePlaintext = attachment ? wireText : messageText;
             const cipherTexts = await prepareOutgoingCipherTexts({
               token: accessToken,
               chatId: activeChatId,
@@ -1710,7 +1761,7 @@ export default function App() {
               localDeviceId: material.deviceId,
               peerUserId: chat.peerUserId,
               peerDeviceId: stored?.peerDeviceId ?? "",
-              plaintexts: [messageText]
+              plaintexts: [e2eePlaintext]
             });
             if (!cipherTexts?.length) throw new Error("e2ee_encrypt_failed");
             let lastCreated: MessageApiResponseItem | null = null;
@@ -1764,7 +1815,8 @@ export default function App() {
                           mediaId: attachment.mediaId,
                           preview: attachmentPreviewUrl,
                           previewType: attachment.type,
-                          fileName: attachment.name
+                          fileName: attachment.name,
+                          mediaE2ee: attachment.mediaE2ee
                         }
                       : uiMessage
                   ]
