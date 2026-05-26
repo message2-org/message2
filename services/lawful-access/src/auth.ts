@@ -35,9 +35,9 @@ export const isIpAllowed = (ip: string, allowlist: string[]): boolean => {
 export const getClientIp = (req: Request): string => {
   const forwarded = req.header("x-forwarded-for");
   if (forwarded) {
-    return forwarded.split(",")[0]?.trim() ?? req.ip;
+    return forwarded.split(",")[0]?.trim() ?? req.ip ?? "unknown";
   }
-  return req.ip;
+  return req.ip ?? "unknown";
 };
 
 export const isMtlsVerified = (req: Request): boolean => {

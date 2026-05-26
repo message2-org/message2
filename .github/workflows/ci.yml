@@ -19,5 +19,8 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install
+      - run: pnpm --filter @message2/access-audit prisma:generate
+      - run: pnpm --filter @message2/notifications prisma:generate
+      - run: pnpm --filter @message2/messaging prisma:generate
       - run: pnpm build
       - run: pnpm test

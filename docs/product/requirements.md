@@ -34,6 +34,8 @@ Corporate connectivity (install-time, auditable): `isolated` | `federation` (pee
 **Full policy/spec:** [lawful-access-transparency.md](../security/lawful-access-transparency.md)  
 **Client build order (web, mobile, desktop):** [client-platform-roadmap.md](./client-platform-roadmap.md)
 
+**Integration quality:** feature branches merge to `develop` only after green CI (`pnpm build && pnpm test`). See [agent-coordination.md](../ops/agent-coordination.md).
+
 ### Public profile — functional requirements (v2+)
 
 - Lawful operations rejected without `legalRef`, `reasonCode`, and minimum-length `reasonText`.

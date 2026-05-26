@@ -28,7 +28,7 @@ feature/*      o--o      o--o
 
 1. Branch from `develop`: `git checkout develop && git pull && git checkout -b feature/my-change`
 2. Commit in small logical chunks on the feature branch.
-3. Open PR (or merge locally): `feature/*` → `develop`; run `pnpm build && pnpm test`.
+3. Open PR (or merge locally): `feature/*` → `develop`; CI must be green (`pnpm build && pnpm test`) before merge.
 4. **Do not merge `develop` → `main` routinely.** Merge to `main` only for **large, release-shaped milestones** (e.g. first packaged web build, Android store track, desktop installer) via `release/v0.x.y` → `main` + tag → merge back to `develop`.
 5. Hotfix from `main` only when a tagged production line is broken; always merge hotfix into `develop` too.
 
@@ -47,8 +47,8 @@ Use **claims + branches** together ([agent-coordination.md](./agent-coordination
 1. Pick a unique `task_id` (e.g. `track-b-push`); register `in_progress` in `docs/ai-context.md` §4.
 2. `git checkout develop && git pull && git checkout -b feature/<task_id>` — branch name matches `task_id`.
 3. Commit on that branch only; do not share one branch between two agent chats.
-4. Before PR: `git pull origin develop` (merge or rebase), run `pnpm build && pnpm test`.
-5. PR `feature/<task_id>` → `develop`; after merge, set claim `done`.
+4. Before PR: `git pull origin develop` (merge or rebase), run `pnpm build && pnpm test` locally.
+5. PR `feature/<task_id>` → `develop` only after **green CI** on the PR; after merge, set claim `done`.
 
 Parallel agents on **different** `task_id` branches are safe; conflicts appear only when merging to `develop` if the same files changed.
 

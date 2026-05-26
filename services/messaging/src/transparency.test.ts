@@ -35,7 +35,6 @@ test("applyTransparencyEvent skips user notices on corporate profile", async () 
     chatMember: {
       findMany: async () => [{ userId: "6ba7b811-9dad-11d1-80b4-00c04fd43008" }]
     },
-    message: { findMany: async () => [] },
     transparencyUserNotice: {
       createMany: async () => {
         noticeWrites += 1;

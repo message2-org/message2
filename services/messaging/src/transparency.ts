@@ -17,7 +17,7 @@ export type TransparencyIngressPayload = Pick<
   | "createdAt"
 >;
 
-const tombstoneLabel = (action: PrivilegedAction, locale: "ru" = "ru") => {
+const tombstoneLabel = (action: PrivilegedAction, locale: "ru" | "en" = "ru") => {
   if (locale === "en") {
     if (action === "message_delete") return "Message removed following an authorized request.";
     return "Message affected by a privileged access operation.";

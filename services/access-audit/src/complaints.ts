@@ -5,7 +5,7 @@ import {
   type ComplaintStatus
 } from "@message2/contracts";
 import type { TransparencyEventV1 } from "@message2/contracts";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "./generated/prisma/client.js";
 import { config } from "./config.js";
 import { prisma } from "./prisma.js";
 import {

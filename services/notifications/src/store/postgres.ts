@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../generated/prisma/client.js";
 import type { FcmRegisterInput, WebPushSubscriptionInput } from "@message2/contracts";
 
 const prisma = new PrismaClient();
