@@ -115,6 +115,8 @@ pnpm build && pnpm test   # before PR
 
 If PR is not merged yet, leave claim as `in_progress` with note `PR #N open` or set `needs_rework` if abandoned.
 
+**PR is not done until merged with green CI:** GitHub Actions (or local equivalent) must pass `pnpm build && pnpm test` on the PR branch before merge to `develop`. A failing or skipped CI run blocks merge; fix or re-run until green, then set the claim to `done`.
+
 ## Git vs doc locks (summary)
 
 | Mechanism | Role |

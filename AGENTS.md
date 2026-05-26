@@ -91,7 +91,7 @@ pnpm --filter @message2/messaging test
 
 ## When finishing a task
 
-1. Set the claim row in `docs/ai-context.md` §4 to `done`, `needs_rework`, or `cancelled` (see [agent-coordination.md](docs/ops/agent-coordination.md)).
+1. Set the claim row in `docs/ai-context.md` §4 to `done`, `needs_rework`, or `cancelled` only after the PR is **merged to `develop` with green CI** (`pnpm build && pnpm test` in GitHub Actions). See [agent-coordination.md](docs/ops/agent-coordination.md).
 2. Update **sections 2–5** in `docs/ai-context.md` (status, priorities, short decision-log line).
 3. Update **lawful-access-implementation-status.md** checkboxes/changelog when lawful-related. Do not change section 1 (coursework topic).
 

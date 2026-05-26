@@ -21,8 +21,8 @@ While working:
 Before finishing:
 
 - `git pull origin develop` (merge or rebase on feature branch), run `pnpm build && pnpm test` when code changed.
-- Open or update PR: `feature/<task_id>` → `develop` (unless user asked for direct merge).
-- Release claim: `done` (merged), `needs_rework`, or `cancelled`; update `docs/ai-context.md` §2–§5.
+- Open or update PR: `feature/<task_id>` → `develop` (unless user asked for direct merge). PR is not done until **merged with green CI** (`pnpm build && pnpm test`).
+- Release claim: `done` (merged + green CI), `needs_rework`, or `cancelled`; update `docs/ai-context.md` §2–§5.
 
 Full protocol: `docs/ops/agent-coordination.md`. Branching: `docs/ops/git-branching.md`.
 
