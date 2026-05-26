@@ -83,3 +83,32 @@ export {
   type EncryptionMode,
   type InstanceEncryptionPolicy
 } from "./encryption.js";
+
+export {
+  E2EE_DM_CIPHER_PREFIX,
+  E2EE_PROTOCOL_VERSION,
+  E2EE_LABEL_X3DH_SHARED,
+  E2EE_LABEL_DR_ROOT,
+  E2EE_LABEL_DR_CHAIN,
+  E2EE_LABEL_DR_MESSAGE,
+  formatE2eeDmCipherText,
+  parseE2eeDmCipherText,
+  isE2eeDmCipherText,
+  isE2eeHandshakeCipherText,
+  isE2eeX3dhInit,
+  isE2eeX3dhResponse,
+  isE2eeRatchetMsg,
+  validateDeviceId,
+  validatePublishDevicePrekeyBundleInput,
+  type DeviceKeyMaterialV1,
+  type PublishDevicePrekeyBundleInputV1,
+  type DevicePrekeyBundlePublishedV1,
+  type DevicePrekeyBundleSummaryV1,
+  type E2eeX3dhInitV1,
+  type E2eeX3dhResponseV1,
+  type E2eeHandshakePayloadV1,
+  type E2eeRatchetHeaderV1,
+  type E2eeRatchetMsgV1,
+  type E2eeDmPayloadV1,
+  type E2eeValidationError
+} from "./e2ee/index.js";

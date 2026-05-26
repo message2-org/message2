@@ -182,6 +182,38 @@ model EncryptionDowngradeRequest {
   @@map("encryption_downgrade_requests")
 }
 
+model UserDevice {
+  id                    String   @id @default(uuid()) @db.Uuid
+  userId                String   @map("user_id") @db.Uuid
+  deviceId              String   @map("device_id")
+  identityKeyPublic     String   @map("identity_key_public")
+  signingKeyPublic      String   @map("signing_key_public")
+  signedPrekeyId        Int      @map("signed_prekey_id")
+  signedPrekeyPublic    String   @map("signed_prekey_public")
+  signedPrekeySignature String   @map("signed_prekey_signature")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  oneTimePrekeys        DeviceOneTimePrekey[]
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@map("user_devices")
+}
+
+model DeviceOneTimePrekey {
+  id          String    @id @default(uuid()) @db.Uuid
+  deviceRowId String    @map("device_row_id") @db.Uuid
+  prekeyId    Int       @map("prekey_id")
+  publicKey   String    @map("public_key")
+  consumedAt  DateTime? @map("consumed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  device      UserDevice @relation(fields: [deviceRowId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceRowId, prekeyId])
+  @@index([deviceRowId, consumedAt])
+  @@map("device_one_time_prekeys")
+}
+
 enum UserRole {
   user
   admin

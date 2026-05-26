@@ -109,8 +109,6 @@ services:
       INTERNAL_SERVICE_SECRET: ${MESSAGE2_INTERNAL_SERVICE_SECRET:-change-me-internal}
       NOTIFICATIONS_URL: http://notifications:4003
       ACCESS_AUDIT_URL: http://access-audit:4004
-      INTERNAL_SERVICE_SECRET: ${MESSAGE2_INTERNAL_SERVICE_SECRET:-change-me-internal}
-      ACCESS_AUDIT_URL: http://access-audit:4004
     ports:
       - "4001:4001"
     healthcheck:

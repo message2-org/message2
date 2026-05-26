@@ -23,6 +23,7 @@ import { applyTransparencyEvent, type TransparencyIngressPayload } from "./trans
 import { instanceConfig } from "./instance-config.js";
 import { requireUserTransparency } from "./profile-guards.js";
 import { registerEncryptionRoutes } from "./encryption-routes.js";
+import { registerE2eeRoutes } from "./e2ee-routes.js";
 import { ensureInstanceEncryptionPolicy } from "./encryption-policy.js";
 
 process.loadEnvFile?.();
@@ -91,17 +92,15 @@ const auth = (req: AuthRequest, res: express.Response, next: express.NextFunctio
   }
 };
 
-const toAuthRole = (role: User["role"]): "user" | "admin" => (role === "admin" ? "admin" : "user");
-
 function routeParam(value: string | string[] | undefined): string | undefined {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) return value[0];
   return undefined;
 }
 
+const toAuthRole = (role: User["role"]): "user" | "admin" => (role === "admin" ? "admin" : "user");
 const accessSignOptions: SignOptions = { expiresIn: accessTokenTtl as SignOptions["expiresIn"] };
 const refreshSignOptions: SignOptions = { expiresIn: refreshTokenTtl as SignOptions["expiresIn"] };
-
 const issueAccessToken = (user: User) =>
   jwt.sign({ sub: user.id, role: toAuthRole(user.role) }, jwtSecret, accessSignOptions);
 const issueRefreshToken = (user: User) =>
@@ -814,6 +813,7 @@ app.get("/instance/profile", async (_req, res) => {
 });
 
 registerEncryptionRoutes({ app, prisma, auth, requireAdmin });
+registerE2eeRoutes({ app, prisma, auth });
 
 app.post("/chats", auth, async (req: AuthRequest, res) => {
   try {

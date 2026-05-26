@@ -13,6 +13,7 @@ app.use(helmet());
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 const jwtSecret = process.env.JWT_SECRET ?? "change-me-in-production";
+
 function routeParam(value: string | string[] | undefined): string | undefined {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) return value[0];

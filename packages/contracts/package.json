@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "test": "node --import tsx --test src/lawful-validation.test.ts src/lawful-api-mapper.test.ts src/deployment-profile.test.ts src/encryption.test.ts"
+    "test": "node --import tsx --test src/lawful-validation.test.ts src/lawful-api-mapper.test.ts src/deployment-profile.test.ts src/encryption.test.ts src/e2ee/codec.test.ts src/e2ee/validation.test.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.3"

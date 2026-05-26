@@ -7,9 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc -b --noEmit",
-    "test": "tsx --test src/smoke.test.ts"
+    "test": "node --import tsx --test src/smoke.test.ts src/crypto/ratchet.test.ts"
   },
   "dependencies": {
+    "@message2/contracts": "workspace:*",
     "emoji-picker-react": "^4.12.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

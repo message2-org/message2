@@ -7,6 +7,15 @@ import { fetchMediaBlobUrl, uploadMediaFile } from "./lib/media";
 import { registerWebPush } from "./lib/push";
 import { useResolvedAvatarUrl } from "./hooks/useResolvedAvatarUrl";
 import { TransparencyDetailModal } from "./components/TransparencyDetailModal";
+import { isE2eeDmCipherText } from "@message2/contracts";
+import { readDeviceKeyMaterial, readDmSession } from "./crypto/store.js";
+import {
+  decodeIncomingCipherText,
+  ensureLocalDeviceRegistered,
+  isE2eeHandshakeCipherText,
+  prepareOutgoingCipherTexts,
+  shouldUseDmE2ee
+} from "./e2ee/dm-wire.js";
 import {
   AuthMode,
   AuthUser,
@@ -529,6 +538,8 @@ export default function App() {
     requestedMode: string;
   } | null>(null);
   const wsHasOpenedRef = useRef(false);
+  const chatsRef = useRef(chats);
+  const chatEncryptionModeRef = useRef(chatEncryptionMode);
   const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [typingByChat, setTypingByChat] = useState<Record<string, { userId: string; displayName: string }[]>>({});
@@ -545,6 +556,14 @@ export default function App() {
   useEffect(() => {
     userTransparencyEnabledRef.current = userTransparencyEnabled;
   }, [userTransparencyEnabled]);
+
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
+
+  useEffect(() => {
+    chatEncryptionModeRef.current = chatEncryptionMode;
+  }, [chatEncryptionMode]);
 
   const toChatItem = (chat: ChatApiResponseItem): ChatItem => {
     const last = chat.lastMessage;
@@ -669,6 +688,39 @@ export default function App() {
         : {})
     };
   };
+
+  async function mapApiMessageToUi(message: MessageApiResponseItem, chatId: string): Promise<Message | null> {
+    if (isE2eeHandshakeCipherText(message.cipherText)) return null;
+    const chat = chatsRef.current.find((item) => item.id === chatId);
+    if (
+      chat &&
+      shouldUseDmE2ee(chat.kind, chatEncryptionModeRef.current) &&
+      isE2eeDmCipherText(message.cipherText)
+    ) {
+      const material = readDeviceKeyMaterial();
+      if (!material) {
+        return toUiMessage({
+          ...message,
+          cipherText: locale === "ru" ? "[E2EE: нет ключей устройства]" : "[E2EE: device keys missing]"
+        });
+      }
+      try {
+        const plain = await decodeIncomingCipherText({
+          chatId,
+          cipherText: message.cipherText,
+          localMaterial: material
+        });
+        if (plain === null) return null;
+        return toUiMessage({ ...message, cipherText: plain });
+      } catch {
+        return toUiMessage({
+          ...message,
+          cipherText: locale === "ru" ? "[не удалось расшифровать]" : "[decryption failed]"
+        });
+      }
+    }
+    return toUiMessage(message);
+  }
 
   const messagesByChatWithMedia = useMemo(() => {
     const next: Record<string, Message[]> = {};
@@ -838,6 +890,15 @@ export default function App() {
   }, [session?.accessToken]);
 
   useEffect(() => {
+    if (!session?.accessToken) return;
+    void runAuthorized(async (accessToken) => {
+      const existing = readDeviceKeyMaterial();
+      const deviceId = existing?.deviceId ?? `web-${crypto.randomUUID().slice(0, 8)}`;
+      await ensureLocalDeviceRegistered(accessToken, deviceId);
+    }).catch(() => {});
+  }, [session?.accessToken]);
+
+  useEffect(() => {
     if (!authUser || !session || chats.length === 0) return;
     const params = new URLSearchParams(window.location.search);
     const chatFromUrl = params.get("chat");
@@ -920,21 +981,20 @@ export default function App() {
 
       const currentChatId = activeChatIdRef.current;
       if (!currentChatId) return;
-      void runAuthorized((accessToken) => requestMessages(accessToken, currentChatId))
-        .then((rows) => {
-          if (stopped) return;
-          setMessagesByChat((prev) => {
-            const merged = rows.map((row) => {
-              const ui = toUiMessage(row);
-              const meta = messagePreviewById[ui.id];
-              const blob = ui.mediaId ? mediaBlobById[ui.mediaId] : undefined;
-              const withMedia = blob && !ui.preview ? { ...ui, preview: blob } : ui;
-              return meta ? { ...withMedia, ...meta } : withMedia;
-            });
-            return { ...prev, [currentChatId]: merged };
-          });
-        })
-        .catch(() => undefined);
+      void runAuthorized(async (accessToken) => {
+        const rows = await requestMessages(accessToken, currentChatId);
+        if (stopped) return;
+        const merged: Message[] = [];
+        for (const row of rows) {
+          const ui = await mapApiMessageToUi(row, currentChatId);
+          if (!ui) continue;
+          const meta = messagePreviewById[ui.id];
+          const blob = ui.mediaId ? mediaBlobById[ui.mediaId] : undefined;
+          const withMedia = blob && !ui.preview ? { ...ui, preview: blob } : ui;
+          merged.push(meta ? { ...withMedia, ...meta } : withMedia);
+        }
+        setMessagesByChat((prev) => ({ ...prev, [currentChatId]: merged }));
+      }).catch(() => undefined);
     }, 1500);
 
     return () => {
@@ -1187,14 +1247,17 @@ export default function App() {
           if (parsed.type === "message.updated" || parsed.type === "message.deleted") {
             const payload = parsed.payload as MessageApiResponseItem;
             if (!payload.chatId) return;
-            const uiMessage = toUiMessage(payload);
-            setMessagesByChat((prev) => {
-              const rows = prev[payload.chatId] ?? [];
-              return {
-                ...prev,
-                [payload.chatId]: rows.map((row) => (row.id === uiMessage.id ? uiMessage : row))
-              };
-            });
+            void runAuthorized(async (accessToken) => {
+              const uiMessage = await mapApiMessageToUi(payload, payload.chatId!);
+              if (!uiMessage) return;
+              setMessagesByChat((prev) => {
+                const rows = prev[payload.chatId!] ?? [];
+                return {
+                  ...prev,
+                  [payload.chatId!]: rows.map((row) => (row.id === uiMessage.id ? uiMessage : row))
+                };
+              });
+            }).catch(() => undefined);
             return;
           }
 
@@ -1229,35 +1292,42 @@ export default function App() {
 
           if (parsed.type !== "message.created") return;
           const payload = parsed.payload;
-          const uiMessage = toUiMessage(payload);
+          if (isE2eeHandshakeCipherText(payload.cipherText)) return;
           const currentLocale = localeRef.current;
           const currentUserId = authUserRef.current?.id;
           const currentActiveChatId = activeChatIdRef.current;
-          setMessagesByChat((prev) => {
-            const existing = prev[payload.chatId] ?? [];
-            if (existing.some((item) => item.id === uiMessage.id)) return prev;
-            return { ...prev, [payload.chatId]: [...existing, uiMessage] };
-          });
-          setChats((prev) =>
-            prev.map((chat) =>
-              chat.id === payload.chatId
-                ? {
-                    ...chat,
-                    lastMessage: payload.cipherText,
-                    lastSenderType: payload.senderId === currentUserId ? "me" : "other",
-                    lastSenderName:
-                      payload.senderId === currentUserId
-                        ? currentLocale === "ru"
-                          ? "Вы"
-                          : "You"
-                        : payload.senderDisplayName,
-                    lastAt: payload.sentAt,
-                    lastDelivery: payload.senderId === currentUserId ? "sent" : null,
-                    unread: payload.senderId === currentUserId || chat.id === currentActiveChatId ? chat.unread : chat.unread + 1
-                  }
-                : chat
-            )
-          );
+          void runAuthorized(async (accessToken) => {
+            const uiMessage = await mapApiMessageToUi(payload, payload.chatId);
+            if (!uiMessage) return;
+            setMessagesByChat((prev) => {
+              const existing = prev[payload.chatId] ?? [];
+              if (existing.some((item) => item.id === uiMessage.id)) return prev;
+              return { ...prev, [payload.chatId]: [...existing, uiMessage] };
+            });
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === payload.chatId
+                  ? {
+                      ...chat,
+                      lastMessage: uiMessage.text,
+                      lastSenderType: payload.senderId === currentUserId ? "me" : "other",
+                      lastSenderName:
+                        payload.senderId === currentUserId
+                          ? currentLocale === "ru"
+                            ? "Вы"
+                            : "You"
+                          : payload.senderDisplayName,
+                      lastAt: payload.sentAt,
+                      lastDelivery: payload.senderId === currentUserId ? "sent" : null,
+                      unread:
+                        payload.senderId === currentUserId || chat.id === currentActiveChatId
+                          ? chat.unread
+                          : chat.unread + 1
+                    }
+                  : chat
+              )
+            );
+          }).catch(() => undefined);
         } catch {
           // Ignore malformed WS payloads.
         }
@@ -1291,8 +1361,15 @@ export default function App() {
     const cached = messagesByChat[chatId];
     if (cached) return;
     try {
-      const rows = await runAuthorized((accessToken) => requestMessages(accessToken, chatId));
-      setMessagesByChat((prev) => ({ ...prev, [chatId]: rows.map(toUiMessage) }));
+      await runAuthorized(async (accessToken) => {
+        const rows = await requestMessages(accessToken, chatId);
+        const merged: Message[] = [];
+        for (const row of rows) {
+          const ui = await mapApiMessageToUi(row, chatId);
+          if (ui) merged.push(ui);
+        }
+        setMessagesByChat((prev) => ({ ...prev, [chatId]: merged }));
+      });
     } catch {
       setMessagesByChat((prev) => ({ ...prev, [chatId]: prev[chatId] ?? [] }));
     }
@@ -1564,8 +1641,28 @@ export default function App() {
         }, 2500);
       }}
       onEditMessage={async (chatId, messageId, cipherText) => {
-        const updated = await runAuthorized((accessToken) => requestEditMessage(accessToken, chatId, messageId, cipherText));
-        const uiMessage = toUiMessage(updated);
+        const updated = await runAuthorized(async (accessToken) => {
+          const chat = chatsRef.current.find((item) => item.id === chatId);
+          const material = readDeviceKeyMaterial();
+          let wireCipher = cipherText;
+          if (chat?.peerUserId && material && shouldUseDmE2ee(chat.kind, chatEncryptionModeRef.current)) {
+            const stored = readDmSession(chatId);
+            const cipherTexts = await prepareOutgoingCipherTexts({
+              token: accessToken,
+              chatId,
+              chatKind: chat.kind,
+              encryptionMode: chatEncryptionModeRef.current,
+              localDeviceId: material.deviceId,
+              peerUserId: chat.peerUserId,
+              peerDeviceId: stored?.peerDeviceId ?? "",
+              plaintexts: [cipherText]
+            });
+            wireCipher = cipherTexts?.[cipherTexts.length - 1] ?? cipherText;
+          }
+          return requestEditMessage(accessToken, chatId, messageId, wireCipher);
+        });
+        const uiMessage = await mapApiMessageToUi(updated, chatId);
+        if (!uiMessage) return;
         setMessagesByChat((prev) => ({
           ...prev,
           [chatId]: (prev[chatId] ?? []).map((row) => (row.id === uiMessage.id ? uiMessage : row))
@@ -1663,17 +1760,51 @@ export default function App() {
         if (attachment) {
           URL.revokeObjectURL(attachment.localPreview);
         }
-        void runAuthorized((accessToken) =>
-          requestSendMessage(
+        void runAuthorized(async (accessToken) => {
+          const chat = chatsRef.current.find((item) => item.id === activeChatId);
+          const material = readDeviceKeyMaterial();
+          const useE2ee =
+            !attachment &&
+            chat?.peerUserId &&
+            material &&
+            shouldUseDmE2ee(chat.kind, chatEncryptionModeRef.current);
+          if (useE2ee && chat?.peerUserId && material) {
+            const stored = readDmSession(activeChatId);
+            const cipherTexts = await prepareOutgoingCipherTexts({
+              token: accessToken,
+              chatId: activeChatId,
+              chatKind: chat.kind,
+              encryptionMode: chatEncryptionModeRef.current,
+              localDeviceId: material.deviceId,
+              peerUserId: chat.peerUserId,
+              peerDeviceId: stored?.peerDeviceId ?? "",
+              plaintexts: [messageText]
+            });
+            if (!cipherTexts?.length) throw new Error("e2ee_encrypt_failed");
+            let lastCreated: MessageApiResponseItem | null = null;
+            for (const cipher of cipherTexts) {
+              lastCreated = await requestSendMessage(
+                accessToken,
+                activeChatId,
+                cipher,
+                null,
+                replySnapshot?.id ?? null
+              );
+            }
+            if (!lastCreated) throw new Error("send_failed");
+            return lastCreated;
+          }
+          return requestSendMessage(
             accessToken,
             activeChatId,
             wireText,
             attachment?.mediaId ?? null,
             replySnapshot?.id ?? null
-          )
-        )
-          .then((created) => {
-            const uiMessage = toUiMessage(created);
+          );
+        })
+          .then(async (created) => {
+            const uiMessage = await mapApiMessageToUi(created, activeChatId);
+            if (!uiMessage) return;
             if (attachment && attachmentPreviewUrl) {
               setMessagePreviewById((prev) => ({
                 ...prev,
