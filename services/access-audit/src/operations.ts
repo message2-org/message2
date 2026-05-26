@@ -8,6 +8,7 @@ const propagateTransparency = async (event: TransparencyEventV1) => {
   try {
     const response = await fetch(`${config.messagingUrl}/internal/transparency`, {
       method: "POST",
+      signal: AbortSignal.timeout(3_000),
       headers: {
         "content-type": "application/json",
         "x-internal-secret": config.internalServiceSecret
@@ -35,6 +36,7 @@ const propagateTransparency = async (event: TransparencyEventV1) => {
   try {
     await fetch(`${config.notificationsUrl}/notifications/transparency`, {
       method: "POST",
+      signal: AbortSignal.timeout(3_000),
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         eventId: event.id,
