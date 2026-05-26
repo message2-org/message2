@@ -73,6 +73,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - [x] Admin install wizard: corporate connectivity cards, env snippets, drift vs `GET /instance/profile` (PR #2).
 - [x] CI on `develop`: monorepo `pnpm build` + `pnpm test` green; isolated Prisma clients; workflow `prisma:generate` steps (PR #4).
 - [x] Track C: DM E2EE web wire (`e2ee_strict` text DMs, prekeys API, Double Ratchet); PR #5.
+- [x] Track C: media E2EE for web DM (`e2ee_strict` attachment envelope + client decrypt); PR #7.
 
 ### Active work (claims) — multi-agent
 
@@ -86,7 +87,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `web-auth-interactive-states` | `done` | `cursor:auth-hover` | `2026-05-26` | `apps/web/src/index.css` AuthPage hover/active | `feature/web-auth-interactive-states` | PR #6 merged |
 | `track-c-e2ee-web-wire` | `done` | `cursor:track-c-e2ee` | `2026-05-26` | `packages/contracts`, `services/messaging`, `apps/web` | `feature/track-c-e2ee-web-wire` | PR #5 merged |
 | `track-b-web-session-restore` | `done` | `cursor:web-session-restore` | `2026-05-26` | `apps/web/src/auth` | `feature/track-b-web-session-restore` | PR #3 merged |
-| `track-c-e2ee-media-wire` | `in_progress` | `cursor:track-c-e2ee-media` | `2026-05-26` | `apps/web/src/e2ee`, `services/media`, `packages/contracts` | `feature/track-c-e2ee-media-wire` | media E2EE start |
+| `track-c-e2ee-media-wire` | `done` | `cursor:track-c-e2ee-media` | `2026-05-26` | `apps/web/src/e2ee`, `services/media`, `packages/contracts` | `feature/track-c-e2ee-media-wire` | PR #7 merged |
 
 ### Planned next (pick one track for new agents)
 
@@ -152,6 +153,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-26: Green CI policy documented; PR #4 — TS/Prisma fixes, CI workflow `prisma:generate`, `develop` build/test green.
 - 2026-05-26: AuthPage hover/active affordances (inputs, avatar, language, theme, submit) — `apps/web/src/index.css`; PR #6 → `develop`.
 - 2026-05-26: Track C — DM E2EE prekeys API + web Double Ratchet wire (`e2ee_strict` text DMs); migration `20260526120000_e2ee_prekeys`; PR #5 → `develop`.
+- 2026-05-26: Track C — web media E2EE for DM in `e2ee_strict` (encrypted blob upload + client decrypt); PR #7 → `develop`.
 
 ## 6) Handoff for new Cursor / cloud agents
 
