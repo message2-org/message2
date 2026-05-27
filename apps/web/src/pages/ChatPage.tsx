@@ -6,6 +6,7 @@ import { chatMatchesSearch } from "../search-utils";
 import { AuthUser, ChatItem, Message, PendingAttachment, TransparencyBanner } from "../types";
 import { SidebarDiscovery, type DiscoveryTabId } from "../components/SidebarDiscovery";
 import {
+  AppChatIcon,
   ArchiveIcon,
   BellIcon,
   CalendarIcon,
@@ -28,6 +29,7 @@ import {
   PollIcon,
   SearchIcon,
   SendPlaneIcon,
+  SavedMessagesIcon,
   SettingsIcon,
   StarIcon,
   UsersIcon,
@@ -318,8 +320,17 @@ export function ChatPage(props: ChatPageProps) {
       document.removeEventListener("keydown", onEscape);
     };
   }, [isNewChatMenuOpen]);
+  const localizedChats = useMemo(
+    () =>
+      chats.map((chat) => {
+        const localizedName = localizedSystemChatName(chat);
+        if (localizedName === chat.name) return chat;
+        return { ...chat, name: localizedName };
+      }),
+    [chats, locale]
+  );
   useEffect(() => {
-    const selectedChat = chats.find((chat) => chat.id === activeChatId) ?? null;
+    const selectedChat = localizedChats.find((chat) => chat.id === activeChatId) ?? null;
     if (!isChatInfoOpen || !selectedChat) return;
     setIsChatInfoEditMode(false);
     setActiveChatInfoSection("media");
@@ -327,15 +338,15 @@ export function ChatPage(props: ChatPageProps) {
     setChatInfoDraftDescription(chatDescriptions[selectedChat.id] ?? "");
     setChatInfoDraftAlias(chatDisplayAliases[selectedChat.id] ?? "");
     setChatInfoDraftAvatar(chatInfoAvatars[selectedChat.id] ?? null);
-  }, [isChatInfoOpen, chats, activeChatId, chatDescriptions, chatDisplayAliases, chatInfoAvatars]);
+  }, [isChatInfoOpen, localizedChats, activeChatId, chatDescriptions, chatDisplayAliases, chatInfoAvatars]);
   const effectiveChats = useMemo(
     () =>
-      chats.map((chat) => ({
+      localizedChats.map((chat) => ({
         ...chat,
         isPinned: Boolean(pinnedChats[chat.id]),
         isMuted: Boolean(mutedChats[chat.id])
       })),
-    [chats, pinnedChats, mutedChats]
+    [localizedChats, pinnedChats, mutedChats]
   );
   const filteredChats = effectiveChats
     .filter((chat) => chatMatchesSearch(chat, search))
@@ -350,7 +361,7 @@ export function ChatPage(props: ChatPageProps) {
   const archiveLastChat = archivedChats[0] ?? null;
   const archiveLastMessage = archiveLastChat?.lastMessage ?? (locale === "ru" ? "Архив пуст" : "Archive is empty");
   const chatListItems = isArchiveViewOpen ? archivedChats : mainChats;
-  const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null;
+  const activeChat = localizedChats.find((chat) => chat.id === activeChatId) ?? null;
   const activeChatMessages = activeChat ? messages : [];
   const chatMediaItems = activeChatMessages.filter((message) => message.preview && (message.previewType === "image" || message.previewType === "video"));
   const chatFileItems = activeChatMessages.filter((message) => message.preview && (message.previewType === "file" || message.previewType === "audio"));
@@ -766,6 +777,58 @@ export function ChatPage(props: ChatPageProps) {
     const words = name.trim().split(/\s+/).filter(Boolean);
     return words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "C";
   }
+  function chatNameToken(name: string) {
+    return name.trim().toLowerCase().replace(/\s+/g, "");
+  }
+  function isAppSystemChat(chat: ChatItem) {
+    const token = chatNameToken(chat.name);
+    return chat.peerUsername === "message2_bot" || token === "послание2" || token === "message2" || token === "message2bot";
+  }
+  function isSavedSystemChat(chat: ChatItem) {
+    const token = chatNameToken(chat.name);
+    return token.startsWith("сохран") || token.startsWith("saved");
+  }
+  function localizedSystemChatName(chat: ChatItem) {
+    if (isAppSystemChat(chat)) return locale === "ru" ? "Послание2" : "Message2";
+    if (isSavedSystemChat(chat)) return locale === "ru" ? "Сохранённое" : "Saved";
+    return chat.name;
+  }
+  function renderChatAvatar(chat: ChatItem, className = "") {
+    const avatarClass = `chat-avatar${className ? ` ${className}` : ""}`;
+    if (chat.group === "favorite") {
+      return (
+        <span className={`${avatarClass} chat-avatar--favorite`}>
+          <StarIcon />
+        </span>
+      );
+    }
+    if (chat.group === "archived") {
+      return (
+        <span className={`${avatarClass} chat-avatar--archived`}>
+          <ArchiveIcon />
+        </span>
+      );
+    }
+    if (isAppSystemChat(chat)) {
+      return (
+        <span className={`${avatarClass} chat-avatar--app`}>
+          <AppChatIcon />
+        </span>
+      );
+    }
+    if (isSavedSystemChat(chat)) {
+      return (
+        <span className={`${avatarClass} chat-avatar--saved`}>
+          <SavedMessagesIcon />
+        </span>
+      );
+    }
+    return (
+      <span className={avatarClass} style={{ backgroundImage: chatGradient(chat.id) }}>
+        {getChatInitials(chat.name)}
+      </span>
+    );
+  }
   function chatGradient(id: string) {
     let hash = 0;
     for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) | 0;
@@ -1079,19 +1142,7 @@ export function ChatPage(props: ChatPageProps) {
               }}
             >
               <div className="chat-card__left">
-                {chat.group === "favorite" ? (
-                  <span className="chat-avatar chat-avatar--favorite">
-                    <StarIcon />
-                  </span>
-                ) : chat.group === "archived" ? (
-                  <span className="chat-avatar chat-avatar--archived">
-                    <ArchiveIcon />
-                  </span>
-                ) : (
-                  <span className="chat-avatar" style={{ backgroundImage: chatGradient(chat.id) }}>
-                    {getChatInitials(chat.name)}
-                  </span>
-                )}
+                {renderChatAvatar(chat)}
                 <div>
                   <p className="chat-card__name">{chat.name}</p>
                   <p className="chat-card__message">
@@ -1152,7 +1203,7 @@ export function ChatPage(props: ChatPageProps) {
         {chatContextMenu ? (
           <div className="chat-panel__menu chat-list__context-menu" style={{ top: chatContextMenu.y, left: chatContextMenu.x }} ref={chatContextMenuRef}>
             {(() => {
-              const menuChat = chats.find((chat) => chat.id === chatContextMenu.chatId) ?? null;
+              const menuChat = localizedChats.find((chat) => chat.id === chatContextMenu.chatId) ?? null;
               if (!menuChat) return null;
               const isMuted = Boolean(mutedChats[menuChat.id]);
               const isPinned = Boolean(pinnedChats[menuChat.id]);
@@ -1216,19 +1267,7 @@ export function ChatPage(props: ChatPageProps) {
                 }}
                 aria-label={locale === "ru" ? "Информация о чате" : "Chat info"}
               >
-                {activeChat.group === "favorite" ? (
-                  <span className="chat-avatar chat-avatar--favorite">
-                    <StarIcon />
-                  </span>
-                ) : activeChat.group === "archived" ? (
-                  <span className="chat-avatar chat-avatar--archived">
-                    <ArchiveIcon />
-                  </span>
-                ) : (
-                  <span className="chat-avatar" style={{ backgroundImage: chatGradient(activeChat.id) }}>
-                    {getChatInitials(activeChat.name)}
-                  </span>
-                )}
+                {renderChatAvatar(activeChat)}
               </button>
               <div className="chat-panel__headline">
                 <h2>{activeChat.name}</h2>
@@ -1772,9 +1811,7 @@ export function ChatPage(props: ChatPageProps) {
               {activeChatInfoAvatar || chatInfoDraftAvatar ? (
                 <img src={chatInfoDraftAvatar ?? activeChatInfoAvatar ?? ""} alt="" className="chat-info-main__avatar" />
               ) : (
-                <span className="chat-avatar chat-info-main__avatar" style={{ backgroundImage: activeChat ? chatGradient(activeChat.id) : undefined }}>
-                  {activeChat ? getChatInitials(activeChat.name) : "C"}
-                </span>
+                activeChat ? renderChatAvatar(activeChat, "chat-info-main__avatar") : null
               )}
               {isChatInfoEditMode ? (
                 <label className="avatar-upload chat-info-main__upload">

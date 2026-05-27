@@ -320,12 +320,14 @@ const createRefreshSession = async (userId: string, refreshToken: string, req: e
 
 const SYSTEM_BOT_USERNAME = process.env.ONBOARDING_BOT_USERNAME ?? "message2_bot";
 const SYSTEM_BOT_DISPLAY_NAME = process.env.ONBOARDING_BOT_DISPLAY_NAME ?? "Послание 2";
-const WELCOME_CHAT_TITLE = process.env.ONBOARDING_WELCOME_CHAT_TITLE ?? "Послание 2";
-const SAVED_CHAT_TITLE = process.env.ONBOARDING_SAVED_CHAT_TITLE ?? "Сохранённое";
+const WELCOME_CHAT_TITLE_RU = process.env.ONBOARDING_WELCOME_CHAT_TITLE_RU ?? process.env.ONBOARDING_WELCOME_CHAT_TITLE ?? "Послание2";
+const WELCOME_CHAT_TITLE_EN = process.env.ONBOARDING_WELCOME_CHAT_TITLE_EN ?? process.env.ONBOARDING_WELCOME_CHAT_TITLE ?? "Message2";
+const SAVED_CHAT_TITLE_RU = process.env.ONBOARDING_SAVED_CHAT_TITLE_RU ?? process.env.ONBOARDING_SAVED_CHAT_TITLE ?? "Сохранённое";
+const SAVED_CHAT_TITLE_EN = process.env.ONBOARDING_SAVED_CHAT_TITLE_EN ?? process.env.ONBOARDING_SAVED_CHAT_TITLE ?? "Saved";
 const DEFAULT_WELCOME_TEXT_RU =
   process.env.ONBOARDING_WELCOME_TEXT_RU ??
   process.env.ONBOARDING_WELCOME_TEXT ??
-  "Добро пожаловать в Послание 2! Здесь можно быстро начать общение и проверить, что всё работает.";
+  "Добро пожаловать в Послание2! Здесь можно быстро начать общение и проверить, что всё работает.";
 const DEFAULT_WELCOME_TEXT_EN =
   process.env.ONBOARDING_WELCOME_TEXT_EN ??
   process.env.ONBOARDING_WELCOME_TEXT ??
@@ -354,11 +356,13 @@ const ensureSystemBotUser = async () => {
   });
 };
 
-const createOnboardingChats = async (userId: string, welcomeText: string) => {
+const createOnboardingChats = async (userId: string, locale: "ru" | "en", welcomeText: string) => {
   const systemBot = await ensureSystemBotUser();
+  const welcomeTitle = locale === "en" ? WELCOME_CHAT_TITLE_EN : WELCOME_CHAT_TITLE_RU;
+  const savedTitle = locale === "en" ? SAVED_CHAT_TITLE_EN : SAVED_CHAT_TITLE_RU;
   const welcomeChat = await prisma.chat.create({
     data: {
-      title: WELCOME_CHAT_TITLE,
+      title: welcomeTitle,
       members: {
         create: [{ userId }, { userId: systemBot.id }]
       }
@@ -376,7 +380,7 @@ const createOnboardingChats = async (userId: string, welcomeText: string) => {
 
   await prisma.chat.create({
     data: {
-      title: SAVED_CHAT_TITLE,
+      title: savedTitle,
       members: {
         create: [{ userId }]
       }
@@ -427,7 +431,7 @@ app.post("/auth/register", async (req, res) => {
     await upsertUserPrivateProfile(user.id, email, phone);
     const preferredLocale = resolvePreferredLocale(req);
     const welcomeText = preferredLocale === "en" ? DEFAULT_WELCOME_TEXT_EN : DEFAULT_WELCOME_TEXT_RU;
-    await createOnboardingChats(user.id, welcomeText);
+    await createOnboardingChats(user.id, preferredLocale, welcomeText);
 
     res.status(201).json({
       id: user.id,

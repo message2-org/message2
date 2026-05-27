@@ -95,6 +95,35 @@ export function ArchiveIcon() {
   );
 }
 
+export function AppChatIcon() {
+  return (
+    <svg viewBox="0 0 256 256" aria-hidden="true">
+      <defs>
+        <linearGradient id="chatAppMetalBase" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#4b505c" />
+          <stop offset="46%" stopColor="#2e323c" />
+          <stop offset="100%" stopColor="#171a22" />
+        </linearGradient>
+      </defs>
+      <path fill="currentColor" d="M128 38L196 186L145 178L128 173L111 178L60 186L128 38Z" />
+      <polygon fill="url(#chatAppMetalBase)" opacity="0.55" points="127,43 129,43 144,176 128,171 112,176" />
+      <line x1="128" y1="45" x2="128" y2="172" stroke="#f7f9fc" strokeWidth="4" strokeLinecap="round" opacity="0.8" />
+      <polygon fill="#eceff5" opacity="0.78" points="86,176 108,176 97,206" />
+      <polygon fill="#eceff5" opacity="0.78" points="148,176 170,176 159,206" />
+      <line x1="97" y1="214" x2="97" y2="248" stroke="#f1f4fb" strokeWidth="5" strokeLinecap="round" opacity="0.82" />
+      <line x1="159" y1="214" x2="159" y2="248" stroke="#f1f4fb" strokeWidth="5" strokeLinecap="round" opacity="0.82" />
+    </svg>
+  );
+}
+
+export function SavedMessagesIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 4h10a1.8 1.8 0 0 1 1.8 1.8V20l-6.8-4-6.8 4V5.8A1.8 1.8 0 0 1 7 4Z" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function CheckSingleIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">

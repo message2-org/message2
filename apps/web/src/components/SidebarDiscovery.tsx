@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { ChatItem } from "../types";
 import { copy, type Locale } from "../i18n";
 import { chatMatchesSearch, normalizeSearchQuery } from "../search-utils";
-import { ArchiveIcon, StarIcon, UsersIcon } from "./ui-icons";
+import { AppChatIcon, ArchiveIcon, SavedMessagesIcon, StarIcon, UsersIcon } from "./ui-icons";
 
 const OPEN_DIRECT_CHAT_TIMEOUT_MS = 10_000;
 
@@ -40,6 +40,20 @@ function subscriberCountFor(chatId: string): number {
   let h = 0;
   for (let i = 0; i < chatId.length; i++) h = (h + chatId.charCodeAt(i) * (i + 1)) % 1000000;
   return 120 + (h % 19_800);
+}
+
+function chatNameToken(name: string) {
+  return name.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function isAppSystemChat(chat: ChatItem) {
+  const token = chatNameToken(chat.name);
+  return chat.peerUsername === "message2_bot" || token === "послание2" || token === "message2" || token === "message2bot";
+}
+
+function isSavedSystemChat(chat: ChatItem) {
+  const token = chatNameToken(chat.name);
+  return token.startsWith("сохран") || token.startsWith("saved");
 }
 
 const TAB_ORDER: DiscoveryTabId[] = [
@@ -117,6 +131,42 @@ export function SidebarDiscovery(props: Props) {
     voice: t.discoveryTabVoice
   };
 
+  const renderDiscoveryChatAvatar = (chat: ChatItem) => {
+    if (chat.group === "favorite") {
+      return (
+        <span className="chat-avatar chat-avatar--favorite chat-avatar--discovery">
+          <StarIcon />
+        </span>
+      );
+    }
+    if (chat.group === "archived") {
+      return (
+        <span className="chat-avatar chat-avatar--archived chat-avatar--discovery">
+          <ArchiveIcon />
+        </span>
+      );
+    }
+    if (isAppSystemChat(chat)) {
+      return (
+        <span className="chat-avatar chat-avatar--app chat-avatar--discovery">
+          <AppChatIcon />
+        </span>
+      );
+    }
+    if (isSavedSystemChat(chat)) {
+      return (
+        <span className="chat-avatar chat-avatar--saved chat-avatar--discovery">
+          <SavedMessagesIcon />
+        </span>
+      );
+    }
+    return (
+      <span className="chat-avatar chat-avatar--discovery" style={{ backgroundImage: chatGradient(chat.id) }}>
+        {getChatInitials(chat.name)}
+      </span>
+    );
+  };
+
   return (
     <div className="sidebar-discovery">
       <div className="discovery-tabs" role="tablist" aria-label={t.discoveryTabsLabel}>
@@ -153,19 +203,7 @@ export function SidebarDiscovery(props: Props) {
                     }}
                   >
                     <span className="discovery-chat-pill__avatar">
-                      {chat.group === "favorite" ? (
-                        <span className="chat-avatar chat-avatar--favorite chat-avatar--discovery">
-                          <StarIcon />
-                        </span>
-                      ) : chat.group === "archived" ? (
-                        <span className="chat-avatar chat-avatar--archived chat-avatar--discovery">
-                          <ArchiveIcon />
-                        </span>
-                      ) : (
-                        <span className="chat-avatar chat-avatar--discovery" style={{ backgroundImage: chatGradient(chat.id) }}>
-                          {getChatInitials(chat.name)}
-                        </span>
-                      )}
+                      {renderDiscoveryChatAvatar(chat)}
                     </span>
                     <span className="discovery-chat-pill__name">{chat.name}</span>
                   </button>

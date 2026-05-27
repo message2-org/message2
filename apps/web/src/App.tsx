@@ -189,7 +189,10 @@ async function requestAuth(
     try {
       const response = await fetch(`${baseUrl}${endpoint}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept-Language": locale === "ru" ? "ru-RU,ru;q=0.9" : "en-US,en;q=0.9"
+        },
         body: JSON.stringify(payload),
         signal: controller.signal
       });
