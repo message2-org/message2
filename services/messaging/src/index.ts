@@ -1031,7 +1031,7 @@ const isChatMember = async (chatId: string, userId: string) => {
   return Boolean(membership);
 };
 
-registerMessageRoutes(app, { prisma, auth, isChatMember });
+registerMessageRoutes(app, { prisma, auth, isChatMember, internalServiceSecret });
 
 app.get("/transparency/notices", auth, requireUserTransparency, async (req: AuthRequest, res) => {
   const notices = await prisma.transparencyUserNotice.findMany({

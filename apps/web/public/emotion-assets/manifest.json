@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "gifs": [
+    {
+      "id": "happy",
+      "labelEn": "Happy",
+      "labelRu": "Радость",
+      "url": "/emotion-assets/gifs/happy.gif"
+    },
+    {
+      "id": "wow",
+      "labelEn": "Wow",
+      "labelRu": "Вау",
+      "url": "/emotion-assets/gifs/wow.gif"
+    },
+    {
+      "id": "party",
+      "labelEn": "Party",
+      "labelRu": "Вечеринка",
+      "url": "/emotion-assets/gifs/party.gif"
+    },
+    {
+      "id": "thanks",
+      "labelEn": "Thanks",
+      "labelRu": "Спасибо",
+      "url": "/emotion-assets/gifs/thanks.gif"
+    }
+  ],
+  "videos": [
+    {
+      "id": "wave",
+      "labelEn": "Wave clip",
+      "labelRu": "Волна",
+      "url": "/emotion-assets/videos/wave.mp4"
+    },
+    {
+      "id": "flower",
+      "labelEn": "Flower clip",
+      "labelRu": "Цветок",
+      "url": "/emotion-assets/videos/flower.mp4"
+    }
+  ]
+}

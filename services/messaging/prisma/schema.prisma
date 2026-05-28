@@ -68,6 +68,7 @@ model Message {
 
   @@index([chatId, sentAt(sort: Desc)])
   @@index([replyToMessageId])
+  @@index([kind])
 }
 
 model MessageReaction {
@@ -212,6 +213,42 @@ model DeviceOneTimePrekey {
   @@unique([deviceRowId, prekeyId])
   @@index([deviceRowId, consumedAt])
   @@map("device_one_time_prekeys")
+}
+
+model StickerPack {
+  id          String    @id @default(uuid()) @db.Uuid
+  slug        String    @unique
+  title       String
+  description String?
+  visibility  String    @default("public")
+  isSystem    Boolean   @default(false) @map("is_system")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  stickers    Sticker[]
+
+  @@index([visibility, isSystem])
+  @@map("sticker_packs")
+}
+
+model Sticker {
+  id          String      @id @default(uuid()) @db.Uuid
+  packId      String      @map("pack_id") @db.Uuid
+  code        String
+  label       String
+  render      String      @default("large")
+  assetUrl    String?     @map("asset_url")
+  animated    Boolean     @default(false)
+  tags        String[]
+  sortOrder   Int         @default(0) @map("sort_order")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  pack        StickerPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@index([packId, sortOrder])
+  @@index([render])
+  @@index([tags])
+  @@unique([packId, code])
+  @@map("stickers")
 }
 
 enum UserRole {

@@ -26,6 +26,8 @@ pnpm dev:backend:core # gateway + messaging + media
 pnpm dev:backend      # all backend services
 pnpm build && pnpm test
 pnpm db:migrate:deploy
+pnpm media:fetch-emotions   # download bundled GIF/video presets into apps/web/public/media/emotions
+pnpm media:import-stickers -- --zip private/media-import/inbox/mood.zip --slug mood --title "Mood"
 pnpm db:reset         # dev: wipe Docker DB volume + migrate
 ```
 

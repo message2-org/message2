@@ -1,4 +1,4 @@
-export type MessageKind = "text" | "image" | "video" | "audio" | "file";
+export type MessageKind = "text" | "emoji" | "sticker" | "image" | "video" | "audio" | "file";
 
 export interface EncryptedEnvelope {
   id: string;
@@ -16,7 +16,14 @@ export interface EncryptedEnvelope {
   reactions?: import("./message.js").MessageReactionSummary[];
 }
 
-export type { MessageReactionSummary, MessageReplyPreview, EncryptedEnvelopeV1 } from "./message.js";
+export type {
+  MessageReactionSummary,
+  MessageReplyPreview,
+  EncryptedEnvelopeV1,
+  StickerDto,
+  StickerPackDto,
+  StickerRenderMode
+} from "./message.js";
 
 export type { TransparencyEvent } from "./lawful.js";
 

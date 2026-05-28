@@ -1,0 +1,61 @@
+{
+  "slug": "default-emotion-gifs",
+  "title": "Emotion GIFs",
+  "description": "Animated reactions (bundled media)",
+  "visibility": "public",
+  "isSystem": true,
+  "stickers": [
+    {
+      "code": "happy",
+      "label": "Happy",
+      "render": "large",
+      "assetUrl": "/media/emotions/gifs/happy.gif",
+      "animated": true,
+      "tags": [
+        "happy",
+        "gif",
+        "emotion"
+      ],
+      "sortOrder": 10
+    },
+    {
+      "code": "wow",
+      "label": "Wow",
+      "render": "large",
+      "assetUrl": "/media/emotions/gifs/wow.gif",
+      "animated": true,
+      "tags": [
+        "wow",
+        "gif",
+        "emotion"
+      ],
+      "sortOrder": 20
+    },
+    {
+      "code": "party",
+      "label": "Party",
+      "render": "large",
+      "assetUrl": "/media/emotions/gifs/party.gif",
+      "animated": true,
+      "tags": [
+        "party",
+        "gif",
+        "emotion"
+      ],
+      "sortOrder": 30
+    },
+    {
+      "code": "thanks",
+      "label": "Thanks",
+      "render": "large",
+      "assetUrl": "/media/emotions/gifs/thanks.gif",
+      "animated": true,
+      "tags": [
+        "thanks",
+        "gif",
+        "emotion"
+      ],
+      "sortOrder": 40
+    }
+  ]
+}

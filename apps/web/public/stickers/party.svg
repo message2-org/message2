@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Party">
+  <circle cx="64" cy="64" r="58" fill="#CE93D8"/>
+  <circle cx="44" cy="54" r="8" fill="#4A148C"/>
+  <circle cx="84" cy="54" r="8" fill="#4A148C"/>
+  <path d="M38 78c8 14 44 14 52 0" fill="none" stroke="#4A148C" stroke-width="6" stroke-linecap="round"/>
+  <polygon points="20,24 28,44 10,44" fill="#FF7043"/>
+  <polygon points="108,18 116,38 98,38" fill="#42A5F5"/>
+  <polygon points="64,8 72,28 56,28" fill="#66BB6A"/>
+</svg>

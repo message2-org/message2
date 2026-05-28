@@ -28,9 +28,12 @@ import {
   ChatItem,
   Message,
   PendingAttachment,
+  StickerItem,
+  StickerPack,
   TransparencyBanner,
   TransparencyDetailResponse
 } from "./types";
+import { stickerPreviewLabel } from "./lib/sticker-i18n";
 
 const USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
 const PASSWORD_HAS_LOWER = /[a-z]/;
@@ -57,6 +60,7 @@ type MessageApiResponseItem = {
   senderId: string;
   cipherText: string;
   sentAt: string;
+  kind?: string;
   senderDisplayName?: string;
   disclosure?: Message["disclosure"];
   isTombstone?: boolean;
@@ -89,6 +93,47 @@ type AttachmentPayload = {
     size: number;
   };
 };
+
+type StickerPayload = {
+  v?: number;
+  kind: "sticker";
+  stickerId: string;
+  packId: string;
+  label: string;
+  assetUrl: string;
+  animated?: boolean;
+};
+
+function buildStickerCipherText(sticker: StickerItem): string {
+  return JSON.stringify({
+    v: 1,
+    kind: "sticker",
+    stickerId: sticker.id,
+    packId: sticker.packId,
+    label: sticker.label,
+    assetUrl: sticker.assetUrl ?? "",
+    animated: Boolean(sticker.animated)
+  } satisfies StickerPayload);
+}
+
+function previewFromCipherText(cipherText: string, locale: Locale): string {
+  const trimmed = cipherText.trim();
+  if (!trimmed) return "";
+  try {
+    const parsed = JSON.parse(trimmed) as Partial<StickerPayload & AttachmentPayload>;
+    if (parsed.kind === "sticker") {
+      return typeof parsed.label === "string" && parsed.label.trim() ? parsed.label.trim() : stickerPreviewLabel(locale);
+    }
+    if (parsed.kind === "attachment") {
+      if (typeof parsed.text === "string" && parsed.text.trim()) return parsed.text.trim();
+      if (typeof parsed.fileName === "string" && parsed.fileName.trim()) return parsed.fileName.trim();
+      return locale === "ru" ? "Вложение" : "Attachment";
+    }
+  } catch {
+    // plain text
+  }
+  return trimmed;
+}
 
 function inferPreviewTypeFromDataUrl(value: string): "image" | "video" | "audio" | "file" | null {
   if (!value.startsWith("data:")) return null;
@@ -304,8 +349,11 @@ async function requestSendMessage(
   let bodyText = text;
   let resolvedMediaId = mediaId ?? null;
   try {
-    const parsed = JSON.parse(text) as Partial<AttachmentPayload>;
-    if (parsed.kind === "attachment" && typeof parsed.previewType === "string") {
+    const parsed = JSON.parse(text) as Partial<StickerPayload & AttachmentPayload>;
+    if (parsed.kind === "sticker" && typeof parsed.stickerId === "string" && typeof parsed.assetUrl === "string") {
+      kind = "sticker";
+      bodyText = text;
+    } else if (parsed.kind === "attachment" && typeof parsed.previewType === "string") {
       kind = parsed.previewType;
       bodyText = text;
       if (typeof parsed.mediaId === "string" && parsed.mediaId) {
@@ -386,6 +434,98 @@ async function respondEncryptionDowngrade(
 async function requestDiscover(accessToken: string, query: string) {
   const response = await requestWithAuth(`/discover?query=${encodeURIComponent(query)}`, accessToken);
   return (await response.json()) as DiscoverApiResponse;
+}
+
+async function requestStickerPacks(accessToken: string) {
+  const response = await requestWithAuth("/sticker-packs", accessToken);
+  return (await response.json()) as StickerPack[];
+}
+
+async function requestCreateStickerPack(
+  accessToken: string,
+  payload: { title: string; slug?: string; description?: string; visibility?: "public" | "private" | "corporate" }
+) {
+  const response = await requestWithAuth("/sticker-packs", accessToken, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  return (await response.json()) as StickerPack;
+}
+
+async function requestCreateSticker(
+  accessToken: string,
+  packId: string,
+  payload: {
+    code: string;
+    label: string;
+    render: "large" | "inline";
+    assetUrl?: string;
+    animated?: boolean;
+    tags?: string[];
+    sortOrder?: number;
+  }
+) {
+  const response = await requestWithAuth(`/sticker-packs/${encodeURIComponent(packId)}/stickers`, accessToken, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  return (await response.json()) as {
+    id: string;
+    packId: string;
+    code: string;
+    label: string;
+    render: "large" | "inline";
+    tags: string[];
+    sortOrder: number;
+  };
+}
+
+async function requestUpdateStickerPack(
+  accessToken: string,
+  packId: string,
+  payload: { title?: string; description?: string; visibility?: "public" | "private" | "corporate" }
+) {
+  const response = await requestWithAuth(`/sticker-packs/${encodeURIComponent(packId)}`, accessToken, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  return response.ok;
+}
+
+async function requestDeleteStickerPack(accessToken: string, packId: string) {
+  await requestWithAuth(`/sticker-packs/${encodeURIComponent(packId)}`, accessToken, {
+    method: "DELETE"
+  });
+}
+
+async function requestUpdateSticker(
+  accessToken: string,
+  stickerId: string,
+  payload: {
+    code?: string;
+    label?: string;
+    render?: "large" | "inline";
+    assetUrl?: string | null;
+    animated?: boolean;
+    tags?: string[];
+    sortOrder?: number;
+  }
+) {
+  const response = await requestWithAuth(`/stickers/${encodeURIComponent(stickerId)}`, accessToken, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  return response.ok;
+}
+
+async function requestDeleteSticker(accessToken: string, stickerId: string) {
+  await requestWithAuth(`/stickers/${encodeURIComponent(stickerId)}`, accessToken, {
+    method: "DELETE"
+  });
 }
 
 function translateProfileUpdateError(raw: string, locale: Locale) {
@@ -489,6 +629,7 @@ export default function App() {
   const [discoverUsers, setDiscoverUsers] = useState<DiscoverApiResponse["users"]>([]);
   const [discoverJoinedChannels, setDiscoverJoinedChannels] = useState<DiscoverApiResponse["joinedChannels"]>([]);
   const [discoverSimilarChannels, setDiscoverSimilarChannels] = useState<DiscoverApiResponse["similarChannels"]>([]);
+  const [stickerPacks, setStickerPacks] = useState<StickerPack[]>([]);
   const [isRealtimeReconnecting, setIsRealtimeReconnecting] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [transparencyBanner, setTransparencyBanner] = useState<TransparencyBanner | null>(null);
@@ -541,7 +682,7 @@ export default function App() {
       peerUsername: peer?.username,
       name: chatName,
       status: chat.peerStatus === "online" ? "online" : "offline",
-      lastMessage: last?.cipherText ?? "",
+      lastMessage: last?.cipherText ? previewFromCipherText(last.cipherText, locale) : "",
       lastSenderType: last ? senderType : undefined,
       lastSenderName: senderType === "me" ? (locale === "ru" ? "Вы" : "You") : undefined,
       lastAt: last?.sentAt,
@@ -552,10 +693,21 @@ export default function App() {
 
   const toUiMessage = (message: MessageApiResponseItem): Message => {
     const createdAt = message.sentAt;
+    let parsedSticker: StickerPayload | null = null;
     let parsedAttachment: AttachmentPayload | null = null;
     try {
-      const parsed = JSON.parse(message.cipherText) as Partial<AttachmentPayload>;
-      if (
+      const parsed = JSON.parse(message.cipherText) as Partial<StickerPayload & AttachmentPayload>;
+      if (parsed.kind === "sticker" && typeof parsed.stickerId === "string" && typeof parsed.assetUrl === "string") {
+        parsedSticker = {
+          v: parsed.v,
+          kind: "sticker",
+          stickerId: parsed.stickerId,
+          packId: typeof parsed.packId === "string" ? parsed.packId : "",
+          label: typeof parsed.label === "string" ? parsed.label : stickerPreviewLabel(locale),
+          assetUrl: parsed.assetUrl,
+          animated: parsed.animated
+        };
+      } else if (
         parsed.kind === "attachment" &&
         (parsed.previewType === "image" || parsed.previewType === "video" || parsed.previewType === "audio" || parsed.previewType === "file") &&
         (typeof parsed.mediaId === "string" || typeof parsed.preview === "string")
@@ -588,7 +740,7 @@ export default function App() {
     } catch {
       // Plain text message.
     }
-    if (!parsedAttachment) {
+    if (!parsedAttachment && !parsedSticker) {
       const inferredType = inferPreviewTypeFromDataUrl(message.cipherText);
       if (inferredType) {
         parsedAttachment = {
@@ -631,13 +783,25 @@ export default function App() {
           message.senderDisplayName ??
           (locale === "ru" ? "Собеседник" : "Contact"));
 
+    const stickerLabel = parsedSticker?.label ?? stickerPreviewLabel(locale);
+
     return {
       id: message.id,
       sender: message.senderId === authUser?.id ? "me" : "them",
       author: message.senderId === authUser?.id ? authUser?.displayName ?? (locale === "ru" ? "Вы" : "You") : message.senderDisplayName ?? (locale === "ru" ? "Собеседник" : "Contact"),
-      text: message.isDeleted ? deletedLabel : (parsedAttachment?.text ?? message.cipherText),
+      kind: message.kind ?? (parsedSticker ? "sticker" : parsedAttachment ? parsedAttachment.previewType : "text"),
+      text: message.isDeleted ? deletedLabel : (parsedSticker ? stickerLabel : (parsedAttachment?.text ?? message.cipherText)),
       time: timeLabel,
       createdAt,
+      sticker:
+        message.isDeleted || !parsedSticker
+          ? undefined
+          : {
+              stickerId: parsedSticker.stickerId,
+              assetUrl: parsedSticker.assetUrl,
+              label: stickerLabel,
+              animated: parsedSticker.animated
+            },
       mediaId: message.isDeleted ? undefined : parsedAttachment?.mediaId,
       preview: message.isDeleted ? undefined : parsedAttachment?.preview,
       previewType: message.isDeleted ? undefined : parsedAttachment?.previewType,
@@ -1026,6 +1190,7 @@ export default function App() {
       setDiscoverUsers([]);
       setDiscoverJoinedChannels([]);
       setDiscoverSimilarChannels([]);
+      setStickerPacks([]);
       return;
     }
     let cancelled = false;
@@ -1050,6 +1215,24 @@ export default function App() {
       clearTimeout(timeoutId);
     };
   }, [authUser?.id, session?.accessToken, search]);
+
+  useEffect(() => {
+    if (!authUser?.id || !session?.accessToken) {
+      setStickerPacks([]);
+      return;
+    }
+    let cancelled = false;
+    void runAuthorized(requestStickerPacks)
+      .then((rows) => {
+        if (!cancelled) setStickerPacks(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setStickerPacks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.id, session?.accessToken]);
 
   useEffect(() => {
     if (!authUser?.id || !session?.accessToken) {
@@ -1567,6 +1750,7 @@ export default function App() {
       discoverUsers={discoverUsers}
       discoverJoinedChannels={discoverJoinedChannels}
       discoverSimilarChannels={discoverSimilarChannels}
+      stickerPacks={stickerPacks}
       activeChatId={activeChatId}
       chats={chats}
       messages={activeChatId ? messagesByChatWithMedia[activeChatId] ?? [] : []}
@@ -1846,6 +2030,101 @@ export default function App() {
             }));
           });
       }}
+      onSendSticker={(sticker) => {
+        if (!activeChatId || !sticker.assetUrl) return;
+        const wireText = buildStickerCipherText(sticker);
+        const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const replySnapshot = replyTo;
+        const optimisticMessage: Message = {
+          id: optimisticId,
+          sender: "me",
+          author: authUser.displayName,
+          kind: "sticker",
+          text: sticker.label,
+          time: new Date().toLocaleTimeString(locale === "ru" ? "ru-RU" : "en-US", { hour: "2-digit", minute: "2-digit" }),
+          createdAt: new Date().toISOString(),
+          sticker: {
+            stickerId: sticker.id,
+            assetUrl: sticker.assetUrl,
+            label: sticker.label,
+            animated: sticker.animated
+          },
+          ...(replySnapshot
+            ? {
+                replyTo: {
+                  id: replySnapshot.id,
+                  author: replySnapshot.author,
+                  text: replySnapshot.text,
+                  isDeleted: replySnapshot.isDeleted
+                }
+              }
+            : {})
+        };
+        setReplyTo(null);
+        setMessagesByChat((prev) => ({
+          ...prev,
+          [activeChatId]: [...(prev[activeChatId] ?? []), optimisticMessage]
+        }));
+        void runAuthorized(async (accessToken) => {
+          const chat = chatsRef.current.find((item) => item.id === activeChatId);
+          const material = readDeviceKeyMaterial();
+          const useE2ee =
+            chat?.peerUserId && material && shouldUseDmE2ee(chat.kind, chatEncryptionModeRef.current);
+          if (useE2ee && chat?.peerUserId && material) {
+            const stored = readDmSession(activeChatId);
+            const cipherTexts = await prepareOutgoingCipherTexts({
+              token: accessToken,
+              chatId: activeChatId,
+              chatKind: chat.kind,
+              encryptionMode: chatEncryptionModeRef.current,
+              localDeviceId: material.deviceId,
+              peerUserId: chat.peerUserId,
+              peerDeviceId: stored?.peerDeviceId ?? "",
+              plaintexts: [wireText]
+            });
+            if (!cipherTexts?.length) throw new Error("e2ee_encrypt_failed");
+            let lastCreated: MessageApiResponseItem | null = null;
+            for (const cipher of cipherTexts) {
+              lastCreated = await requestSendMessage(accessToken, activeChatId, cipher, null, replySnapshot?.id ?? null);
+            }
+            if (!lastCreated) throw new Error("send_failed");
+            return lastCreated;
+          }
+          return requestSendMessage(accessToken, activeChatId, wireText, null, replySnapshot?.id ?? null);
+        })
+          .then(async (created) => {
+            const uiMessage = await mapApiMessageToUi(created, activeChatId);
+            if (!uiMessage) return;
+            setMessagesByChat((prev) => ({
+              ...prev,
+              [activeChatId]: (prev[activeChatId] ?? [])
+                .filter((item) => item.id !== optimisticId)
+                .some((item) => item.id === uiMessage.id)
+                ? (prev[activeChatId] ?? []).filter((item) => item.id !== optimisticId)
+                : [...(prev[activeChatId] ?? []).filter((item) => item.id !== optimisticId), uiMessage]
+            }));
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === activeChatId
+                  ? {
+                      ...chat,
+                      lastMessage: uiMessage.text,
+                      lastSenderType: "me",
+                      lastSenderName: locale === "ru" ? "Вы" : "You",
+                      lastAt: created.sentAt,
+                      lastDelivery: "sent"
+                    }
+                  : chat
+              )
+            );
+          })
+          .catch(() => {
+            setMessagesByChat((prev) => ({
+              ...prev,
+              [activeChatId]: (prev[activeChatId] ?? []).filter((item) => item.id !== optimisticId)
+            }));
+          });
+      }}
       onLogout={() => {
         setAuthUser(null);
         setSession(null);
@@ -1964,6 +2243,36 @@ export default function App() {
               : chat
           )
         );
+      }}
+      onCreateStickerPack={async (payload) => {
+        await runAuthorized((accessToken) => requestCreateStickerPack(accessToken, payload));
+        const rows = await runAuthorized(requestStickerPacks);
+        setStickerPacks(rows);
+      }}
+      onCreateSticker={async (packId, payload) => {
+        await runAuthorized((accessToken) => requestCreateSticker(accessToken, packId, payload));
+        const rows = await runAuthorized(requestStickerPacks);
+        setStickerPacks(rows);
+      }}
+      onUpdateStickerPack={async (packId, payload) => {
+        await runAuthorized((accessToken) => requestUpdateStickerPack(accessToken, packId, payload));
+        const rows = await runAuthorized(requestStickerPacks);
+        setStickerPacks(rows);
+      }}
+      onDeleteStickerPack={async (packId) => {
+        await runAuthorized((accessToken) => requestDeleteStickerPack(accessToken, packId));
+        const rows = await runAuthorized(requestStickerPacks);
+        setStickerPacks(rows);
+      }}
+      onUpdateSticker={async (stickerId, payload) => {
+        await runAuthorized((accessToken) => requestUpdateSticker(accessToken, stickerId, payload));
+        const rows = await runAuthorized(requestStickerPacks);
+        setStickerPacks(rows);
+      }}
+      onDeleteSticker={async (stickerId) => {
+        await runAuthorized((accessToken) => requestDeleteSticker(accessToken, stickerId));
+        const rows = await runAuthorized(requestStickerPacks);
+        setStickerPacks(rows);
       }}
     />
     </>

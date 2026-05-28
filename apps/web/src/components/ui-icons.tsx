@@ -186,6 +186,18 @@ export function PencilIcon() {
   );
 }
 
+export function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 7h14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <path d="M9.5 7V5.6A1.4 1.4 0 0 1 10.9 4.2h2.2a1.4 1.4 0 0 1 1.4 1.4V7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <path d="M7.2 7l.8 12.2a1.8 1.8 0 0 0 1.8 1.6h5.4a1.8 1.8 0 0 0 1.8-1.6L17.8 7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+      <line x1="10" y1="10.5" x2="10" y2="17.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <line x1="14" y1="10.5" x2="14" y2="17.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function SettingsIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -207,6 +219,36 @@ export function DotsVerticalIcon() {
       <circle cx="12" cy="5" r="1.8" fill="currentColor" />
       <circle cx="12" cy="12" r="1.8" fill="currentColor" />
       <circle cx="12" cy="19" r="1.8" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function EmojiSmileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth="1.9" />
+      <circle cx="9" cy="10" r="1.1" fill="currentColor" />
+      <circle cx="15" cy="10" r="1.1" fill="currentColor" />
+      <path d="M8.4 14.1c1 1.3 2.2 1.9 3.6 1.9s2.6-.6 3.6-1.9" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function StickerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 20s-6.7-4.1-8.7-7.3C1.6 10 2.5 6.8 5 5.5c2.1-1.1 4.5-.5 6 1.4 1.5-1.9 3.9-2.5 6-1.4 2.5 1.3 3.4 4.5 1.7 7.2C18.7 15.9 12 20 12 20Z" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function GifIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3.8" y="6.2" width="16.4" height="11.6" rx="2.2" fill="none" stroke="currentColor" strokeWidth="1.9" />
+      <path d="M8.2 10.5H7a2 2 0 1 0 0 4h1.2v-1.3H7.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M11 10.5v4M10.3 10.5h1.4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M13.9 10.5h2.9M13.9 12.5h2.4M13.9 14.5h2.1" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </svg>
   );
 }

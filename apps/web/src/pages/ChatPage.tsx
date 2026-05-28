@@ -1,10 +1,20 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type RefObject
+} from "react";
 import EmojiPicker, { type EmojiClickData } from "emoji-picker-react";
 import { buildAvatarGradient, buildUserInitials } from "../lib/avatar";
 import { copy, localeOptions, Locale } from "../i18n";
 import { chatMatchesSearch } from "../search-utils";
-import { AuthUser, ChatItem, Message, PendingAttachment, TransparencyBanner } from "../types";
-import { SidebarDiscovery, type DiscoveryTabId } from "../components/SidebarDiscovery";
+import { AuthUser, ChatItem, Message, PendingAttachment, StickerItem, StickerPack, TransparencyBanner } from "../types";
+import { localizeStickerPacks } from "../lib/sticker-i18n";
+import { emojiPickerCategories, emojiPickerData, emojiPickerLabels } from "../lib/emoji-picker-locale";
+import { EMOTION_GIF_PRESETS, EMOTION_VIDEO_PRESETS } from "../lib/emotion-media";
 import {
   AppChatIcon,
   ArchiveIcon,
@@ -14,6 +24,7 @@ import {
   CheckDoubleIcon,
   CheckSingleIcon,
   DotsVerticalIcon,
+  EmojiSmileIcon,
   FileIcon,
   HamburgerIcon,
   ImageIcon,
@@ -31,7 +42,9 @@ import {
   SendPlaneIcon,
   SavedMessagesIcon,
   SettingsIcon,
+  StickerIcon,
   StarIcon,
+  TrashIcon,
   UsersIcon,
   UserIcon,
   VideoIcon,
@@ -43,6 +56,125 @@ const PASSWORD_HAS_LOWER = /[a-z]/;
 const PASSWORD_HAS_UPPER = /[A-Z]/;
 const PASSWORD_HAS_DIGIT = /\d/;
 const PASSWORD_HAS_SPECIAL = /[^A-Za-z0-9]/;
+const GIF_PRESETS = EMOTION_GIF_PRESETS;
+const VIDEO_PRESETS = EMOTION_VIDEO_PRESETS;
+const FALLBACK_STICKER_ITEMS: StickerItem[] = [
+  { id: "fallback-happy", packId: "fallback-pack", code: "happy", label: "Happy", render: "large", assetUrl: "/stickers/happy.svg", animated: false, tags: ["happy"], sortOrder: 10 },
+  { id: "fallback-love", packId: "fallback-pack", code: "love", label: "Love", render: "large", assetUrl: "/stickers/love.svg", animated: false, tags: ["love"], sortOrder: 20 },
+  { id: "fallback-wow", packId: "fallback-pack", code: "wow", label: "Wow", render: "large", assetUrl: "/stickers/wow.svg", animated: false, tags: ["wow"], sortOrder: 30 },
+  { id: "fallback-party", packId: "fallback-pack", code: "party", label: "Party", render: "large", assetUrl: "/stickers/party.svg", animated: false, tags: ["party"], sortOrder: 40 },
+  { id: "fallback-sleepy", packId: "fallback-pack", code: "sleepy", label: "Sleepy", render: "large", assetUrl: "/stickers/sleepy.svg", animated: false, tags: ["sleep"], sortOrder: 50 },
+  { id: "fallback-angry", packId: "fallback-pack", code: "angry", label: "Angry", render: "large", assetUrl: "/stickers/angry.svg", animated: false, tags: ["angry"], sortOrder: 60 }
+];
+const FALLBACK_STICKER_PACK: StickerPack = {
+  id: "fallback-pack",
+  slug: "fallback-pack",
+  title: "Mood",
+  description: "Local fallback pack",
+  visibility: "public",
+  isSystem: true,
+  createdById: null,
+  stickers: FALLBACK_STICKER_ITEMS
+};
+
+function normalizeLocalMediaUrl(url: string): string {
+  if (url.startsWith("/media/emotions/")) {
+    return url.replace("/media/emotions/", "/emotion-assets/");
+  }
+  if (url.startsWith("/media/import/")) {
+    return url.replace("/media/import/", "/emotion-import/");
+  }
+  return url;
+}
+
+function isVideoAssetUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return /\.(mp4|webm|ogg)(\?.*)?$/i.test(url);
+}
+
+type StickerManagerRowActionsProps = {
+  menuId: string;
+  locale: Locale;
+  openMenuId: string | null;
+  setOpenMenuId: (id: string | null) => void;
+  menuRef: RefObject<HTMLDivElement | null>;
+  deleteLabel: string;
+  onEdit: () => void;
+  onDelete: () => void;
+};
+
+function StickerManagerRowActions({
+  menuId,
+  locale,
+  openMenuId,
+  setOpenMenuId,
+  menuRef,
+  deleteLabel,
+  onEdit,
+  onDelete
+}: StickerManagerRowActionsProps) {
+  const isOpen = openMenuId === menuId;
+  const editLabel = locale === "ru" ? "Изменить" : "Edit";
+  const actionsLabel = locale === "ru" ? "Действия" : "Actions";
+
+  return (
+    <div className="sticker-manager__actions" ref={isOpen ? menuRef : undefined}>
+      <div className="sticker-manager__actions-desktop">
+        <button type="button" className="icon-button icon-button--ghost" onClick={onEdit} aria-label={editLabel} title={editLabel}>
+          <PencilIcon />
+        </button>
+        <button
+          type="button"
+          className="icon-button icon-button--ghost sticker-manager__action-danger"
+          onClick={onDelete}
+          aria-label={deleteLabel}
+          title={deleteLabel}
+        >
+          <TrashIcon />
+        </button>
+      </div>
+      <div className="sticker-manager__actions-mobile chat-panel__menu-wrap">
+        <button
+          type="button"
+          className={`icon-button icon-button--ghost ${isOpen ? "icon-button--active" : ""}`}
+          onClick={() => setOpenMenuId(isOpen ? null : menuId)}
+          aria-label={actionsLabel}
+          aria-expanded={isOpen}
+          title={actionsLabel}
+        >
+          <DotsVerticalIcon />
+        </button>
+        {isOpen ? (
+          <div className="chat-panel__menu sticker-manager__row-menu" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpenMenuId(null);
+                onEdit();
+              }}
+            >
+              <PencilIcon />
+              <span>{editLabel}</span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="chat-panel__menu-danger"
+              onClick={() => {
+                setOpenMenuId(null);
+                onDelete();
+              }}
+            >
+              <TrashIcon />
+              <span>{deleteLabel}</span>
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 type ChatPageProps = {
   locale: Locale;
@@ -66,6 +198,7 @@ type ChatPageProps = {
   discoverUsers: { id: string; username: string; displayName: string }[];
   discoverJoinedChannels: { id: string; name: string; subscribers: number }[];
   discoverSimilarChannels: { id: string; name: string; subscribers: number }[];
+  stickerPacks: StickerPack[];
   activeChatId: string | null;
   chats: ChatItem[];
   messages: Message[];
@@ -82,6 +215,7 @@ type ChatPageProps = {
   onInputChange: (value: string) => void;
   onPrepareAttachment: (file: File) => Promise<PendingAttachment>;
   onSendMessage: (attachment?: PendingAttachment) => void;
+  onSendSticker: (sticker: StickerItem) => void;
   onEditMessage: (chatId: string, messageId: string, cipherText: string) => void | Promise<void>;
   onDeleteMessage: (chatId: string, messageId: string) => void | Promise<void>;
   onToggleReaction: (chatId: string, messageId: string, emoji: string) => void | Promise<void>;
@@ -98,6 +232,37 @@ type ChatPageProps = {
   onUploadAvatar: (file: File | null) => void | Promise<void>;
   onResetAvatar: () => void | Promise<void>;
   onUpdateChat: (chatId: string, payload: { name?: string; group?: "favorite" | "regular" | "archived"; unread?: number }) => void;
+  onCreateStickerPack: (payload: { title: string; slug?: string; description?: string; visibility?: "public" | "private" | "corporate" }) => void | Promise<void>;
+  onCreateSticker: (
+    packId: string,
+    payload: {
+      code: string;
+      label: string;
+      render: "large" | "inline";
+      assetUrl?: string;
+      animated?: boolean;
+      tags?: string[];
+      sortOrder?: number;
+    }
+  ) => void | Promise<void>;
+  onUpdateStickerPack: (
+    packId: string,
+    payload: { title?: string; description?: string; visibility?: "public" | "private" | "corporate" }
+  ) => void | Promise<void>;
+  onDeleteStickerPack: (packId: string) => void | Promise<void>;
+  onUpdateSticker: (
+    stickerId: string,
+    payload: {
+      code?: string;
+      label?: string;
+      render?: "large" | "inline";
+      assetUrl?: string | null;
+      animated?: boolean;
+      tags?: string[];
+      sortOrder?: number;
+    }
+  ) => void | Promise<void>;
+  onDeleteSticker: (stickerId: string) => void | Promise<void>;
 };
 
 export function ChatPage(props: ChatPageProps) {
@@ -120,6 +285,7 @@ export function ChatPage(props: ChatPageProps) {
     discoverUsers,
     discoverJoinedChannels,
     discoverSimilarChannels,
+    stickerPacks,
     activeChatId,
     chats,
     messages,
@@ -136,6 +302,7 @@ export function ChatPage(props: ChatPageProps) {
     onInputChange,
     onPrepareAttachment,
     onSendMessage,
+    onSendSticker,
     onEditMessage,
     onDeleteMessage,
     onToggleReaction,
@@ -145,7 +312,13 @@ export function ChatPage(props: ChatPageProps) {
     onUpdateProfile,
     onUploadAvatar,
     onResetAvatar,
-    onUpdateChat
+    onUpdateChat,
+    onCreateStickerPack,
+    onCreateSticker,
+    onUpdateStickerPack,
+    onDeleteStickerPack,
+    onUpdateSticker,
+    onDeleteSticker
   } = props;
   const t = copy[locale];
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -196,6 +369,31 @@ export function ChatPage(props: ChatPageProps) {
   const [isDiscoveryOpen, setIsDiscoveryOpen] = useState(false);
   const [discoveryTab, setDiscoveryTab] = useState<DiscoveryTabId>("chats");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [isMessageSelectMode, setIsMessageSelectMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
+  const [pickerTab, setPickerTab] = useState<"emoji" | "stickers" | "gifs" | "videos">("emoji");
+  const [pickerSearch, setPickerSearch] = useState("");
+  const [newPackTitle, setNewPackTitle] = useState("");
+  const [newPackSlug, setNewPackSlug] = useState("");
+  const [newStickerPackId, setNewStickerPackId] = useState("");
+  const [newStickerCode, setNewStickerCode] = useState("");
+  const [newStickerLabel, setNewStickerLabel] = useState("");
+  const [newStickerRender, setNewStickerRender] = useState<"large" | "inline">("large");
+  const [newStickerAssetUrl, setNewStickerAssetUrl] = useState("");
+  const [newStickerAnimated, setNewStickerAnimated] = useState(false);
+  const [emojiPickerStickerPackId, setEmojiPickerStickerPackId] = useState("");
+  const [newStickerTags, setNewStickerTags] = useState("");
+  const [stickerToast, setStickerToast] = useState("");
+  const [isStickerManagerOpen, setIsStickerManagerOpen] = useState(false);
+  const [stickerManagerTab, setStickerManagerTab] = useState<"packs" | "stickers">("packs");
+  const [stickerOnlyMine, setStickerOnlyMine] = useState(true);
+  const [editingPackId, setEditingPackId] = useState("");
+  const [editingPackTitle, setEditingPackTitle] = useState("");
+  const [editingStickerId, setEditingStickerId] = useState("");
+  const [editingStickerLabel, setEditingStickerLabel] = useState("");
+  const [stickerManagerRowMenuId, setStickerManagerRowMenuId] = useState<string | null>(null);
+  const stickerManagerMenuRef = useRef<HTMLDivElement | null>(null);
   const chatMenuRef = useRef<HTMLDivElement | null>(null);
   const archiveMenuRef = useRef<HTMLDivElement | null>(null);
   const newChatMenuRef = useRef<HTMLDivElement | null>(null);
@@ -262,6 +460,18 @@ export function ChatPage(props: ChatPageProps) {
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [isEmojiOpen]);
+  useEffect(() => {
+    if (!isStickerManagerOpen) setStickerManagerRowMenuId(null);
+  }, [isStickerManagerOpen]);
+  useEffect(() => {
+    if (!stickerManagerRowMenuId) return;
+    const onDocClick = (event: MouseEvent) => {
+      if (!stickerManagerMenuRef.current) return;
+      if (!stickerManagerMenuRef.current.contains(event.target as Node)) setStickerManagerRowMenuId(null);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [stickerManagerRowMenuId]);
   useEffect(() => {
     if (!chatContextMenu) return;
     const onDocClick = (event: MouseEvent) => {
@@ -348,6 +558,80 @@ export function ChatPage(props: ChatPageProps) {
       })),
     [localizedChats, pinnedChats, mutedChats]
   );
+  const localizedStickerPacks = useMemo(() => localizeStickerPacks(stickerPacks, locale), [stickerPacks, locale]);
+  const stickerMessagePacks = useMemo(
+    () =>
+      localizedStickerPacks
+        .map((pack) => ({
+          ...pack,
+          stickers: pack.stickers
+            .filter((item) => item.render === "large" && item.assetUrl)
+            .map((item) => ({
+              ...item,
+              assetUrl: item.assetUrl ? normalizeLocalMediaUrl(item.assetUrl) : item.assetUrl
+            }))
+        }))
+        .filter((pack) => pack.stickers.length > 0),
+    [localizedStickerPacks]
+  );
+  const stickerMessagePacksWithFallback = useMemo(
+    () => (stickerMessagePacks.length > 0 ? stickerMessagePacks : [FALLBACK_STICKER_PACK]),
+    [stickerMessagePacks]
+  );
+  const activeStickerPickerPack = useMemo(() => {
+    if (!stickerMessagePacksWithFallback.length) return null;
+    return (
+      stickerMessagePacksWithFallback.find((pack) => pack.id === emojiPickerStickerPackId) ?? stickerMessagePacksWithFallback[0]
+    );
+  }, [emojiPickerStickerPackId, stickerMessagePacksWithFallback]);
+  const visiblePickerStickers = useMemo(() => {
+    const source = activeStickerPickerPack?.stickers ?? [];
+    const query = pickerSearch.trim().toLowerCase();
+    if (!query) return source;
+    return source.filter((item) => item.label.toLowerCase().includes(query) || item.code.toLowerCase().includes(query));
+  }, [activeStickerPickerPack, pickerSearch]);
+  const visibleGifs = useMemo(() => {
+    const query = pickerSearch.trim().toLowerCase();
+    if (!query) return GIF_PRESETS;
+    return GIF_PRESETS.filter((item) => item.labelEn.toLowerCase().includes(query) || item.labelRu.toLowerCase().includes(query));
+  }, [pickerSearch]);
+  const visibleVideos = useMemo(() => {
+    const query = pickerSearch.trim().toLowerCase();
+    if (!query) return VIDEO_PRESETS;
+    return VIDEO_PRESETS.filter((item) => item.labelEn.toLowerCase().includes(query) || item.labelRu.toLowerCase().includes(query));
+  }, [pickerSearch]);
+  const managedStickerPacks = useMemo(
+    () => (stickerOnlyMine ? localizedStickerPacks.filter((pack) => !pack.isSystem) : localizedStickerPacks),
+    [stickerOnlyMine, localizedStickerPacks]
+  );
+  const emojiPickerConfig = useMemo(() => emojiPickerLabels(locale), [locale]);
+  const emojiPickerCategoryConfig = useMemo(() => emojiPickerCategories(locale), [locale]);
+  const emojiPickerLocaleData = useMemo(() => emojiPickerData(locale), [locale]);
+  useEffect(() => {
+    if (!activeStickerPickerPack) return;
+    setEmojiPickerStickerPackId((prev) => prev || activeStickerPickerPack.id);
+  }, [activeStickerPickerPack]);
+  useEffect(() => {
+    if (!isEmojiOpen) {
+      setPickerTab("emoji");
+      setPickerSearch("");
+    }
+  }, [isEmojiOpen]);
+  useEffect(() => {
+    if (!isEmojiOpen || pickerTab !== "emoji") return;
+    const root = emojiRef.current;
+    if (!root) return;
+    const input = root.querySelector('input[aria-controls="epr-search-id"]') as HTMLInputElement | null;
+    if (!input) return;
+    if (input.value === pickerSearch) return;
+    input.value = pickerSearch;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }, [isEmojiOpen, pickerTab, pickerSearch]);
+  useEffect(() => {
+    if (!stickerToast) return;
+    const timer = window.setTimeout(() => setStickerToast(""), 2400);
+    return () => window.clearTimeout(timer);
+  }, [stickerToast]);
   const filteredChats = effectiveChats
     .filter((chat) => chatMatchesSearch(chat, search))
     .sort((a, b) => {
@@ -482,6 +766,146 @@ export function ChatPage(props: ChatPageProps) {
     onInputChange(`${input}${emoji.emoji}`);
     setIsEmojiOpen(false);
     requestAnimationFrame(resizeComposerInput);
+  }
+  function sendStickerMessage(sticker: StickerItem) {
+    if (!sticker.assetUrl) return;
+    setIsEmojiOpen(false);
+    onSendSticker(sticker);
+  }
+  function sendGifPreset(url: string, label: string) {
+    sendStickerMessage({
+      id: `gif-${label.toLowerCase().replace(/\s+/g, "-")}`,
+      packId: "emotion-gifs",
+      code: label.toLowerCase().replace(/\s+/g, "-"),
+      label,
+      render: "large",
+      assetUrl: normalizeLocalMediaUrl(url),
+      animated: true,
+      tags: ["gif", "emotion"],
+      sortOrder: 0
+    });
+  }
+  function sendVideoPreset(url: string, label: string) {
+    sendStickerMessage({
+      id: `video-${label.toLowerCase().replace(/\s+/g, "-")}`,
+      packId: "emotion-videos",
+      code: label.toLowerCase().replace(/\s+/g, "-"),
+      label,
+      render: "large",
+      assetUrl: normalizeLocalMediaUrl(url),
+      animated: true,
+      tags: ["video", "emotion"],
+      sortOrder: 0
+    });
+  }
+  function switchPickerTabByWheel(deltaY: number) {
+    const order: Array<"emoji" | "stickers" | "gifs" | "videos"> = ["emoji", "stickers", "gifs", "videos"];
+    const current = order.indexOf(pickerTab);
+    if (current < 0) return;
+    const next =
+      deltaY > 0
+        ? order[(current + 1) % order.length]
+        : order[(current - 1 + order.length) % order.length];
+    setPickerTab(next);
+  }
+  function pickPackPreviewSticker(pack: StickerPack) {
+    if (!pack.stickers.length) return null;
+    let hash = 0;
+    for (let i = 0; i < pack.id.length; i += 1) hash = (hash * 31 + pack.id.charCodeAt(i)) >>> 0;
+    return pack.stickers[hash % pack.stickers.length] ?? pack.stickers[0];
+  }
+  function toggleMessageSelection(messageId: string) {
+    setSelectedMessageIds((prev) => (prev.includes(messageId) ? prev.filter((id) => id !== messageId) : [...prev, messageId]));
+  }
+  function clearMessageSelectionMode() {
+    setIsMessageSelectMode(false);
+    setSelectedMessageIds([]);
+  }
+  async function submitNewStickerPack() {
+    const title = newPackTitle.trim();
+    if (!title) return;
+    try {
+      await onCreateStickerPack({
+        title,
+        slug: newPackSlug.trim() || undefined
+      });
+      setStickerToast(locale === "ru" ? "Пак создан" : "Pack created");
+      setNewPackTitle("");
+      setNewPackSlug("");
+    } catch {
+      setStickerToast(locale === "ru" ? "Не удалось создать пак" : "Failed to create pack");
+    }
+  }
+  async function submitNewSticker() {
+    if (!newStickerPackId.trim() || !newStickerCode.trim() || !newStickerLabel.trim()) return;
+    if (newStickerRender === "large" && !newStickerAssetUrl.trim()) {
+      setStickerToast(locale === "ru" ? "Укажите URL изображения стикера" : "Sticker image URL is required");
+      return;
+    }
+    try {
+      await onCreateSticker(newStickerPackId.trim(), {
+        code: newStickerCode.trim(),
+        label: newStickerLabel.trim(),
+        render: newStickerRender,
+        assetUrl: newStickerRender === "large" ? newStickerAssetUrl.trim() : undefined,
+        animated: newStickerAnimated,
+        tags: newStickerTags
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+      });
+      setStickerToast(locale === "ru" ? "Стикер добавлен" : "Sticker added");
+      setNewStickerCode("");
+      setNewStickerLabel("");
+      setNewStickerAssetUrl("");
+      setNewStickerAnimated(false);
+      setNewStickerTags("");
+    } catch {
+      setStickerToast(locale === "ru" ? "Не удалось добавить стикер" : "Failed to add sticker");
+    }
+  }
+  async function submitPackRename() {
+    if (!editingPackId || !editingPackTitle.trim()) return;
+    try {
+      await onUpdateStickerPack(editingPackId, { title: editingPackTitle.trim() });
+      setStickerToast(locale === "ru" ? "Пак обновлён" : "Pack updated");
+      setEditingPackId("");
+      setEditingPackTitle("");
+    } catch {
+      setStickerToast(locale === "ru" ? "Не удалось обновить пак" : "Failed to update pack");
+    }
+  }
+  async function removePack(packId: string) {
+    const confirmed = window.confirm(locale === "ru" ? "Удалить этот пак?" : "Delete this pack?");
+    if (!confirmed) return;
+    try {
+      await onDeleteStickerPack(packId);
+      setStickerToast(locale === "ru" ? "Пак удалён" : "Pack removed");
+      if (newStickerPackId === packId) setNewStickerPackId("");
+    } catch {
+      setStickerToast(locale === "ru" ? "Не удалось удалить пак" : "Failed to remove pack");
+    }
+  }
+  async function submitStickerRename() {
+    if (!editingStickerId || !editingStickerLabel.trim()) return;
+    try {
+      await onUpdateSticker(editingStickerId, { label: editingStickerLabel.trim() });
+      setStickerToast(locale === "ru" ? "Стикер обновлён" : "Sticker updated");
+      setEditingStickerId("");
+      setEditingStickerLabel("");
+    } catch {
+      setStickerToast(locale === "ru" ? "Не удалось обновить стикер" : "Failed to update sticker");
+    }
+  }
+  async function removeSticker(stickerId: string) {
+    const confirmed = window.confirm(locale === "ru" ? "Удалить этот стикер?" : "Delete this sticker?");
+    if (!confirmed) return;
+    try {
+      await onDeleteSticker(stickerId);
+      setStickerToast(locale === "ru" ? "Стикер удалён" : "Sticker removed");
+    } catch {
+      setStickerToast(locale === "ru" ? "Не удалось удалить стикер" : "Failed to remove sticker");
+    }
   }
   function clearPendingAttachment() {
     if (pendingAttachment) {
@@ -1300,7 +1724,16 @@ export function ChatPage(props: ChatPageProps) {
                     <button type="button"><PencilIcon /><span>{locale === "ru" ? "Переименовать" : "Rename"}</span></button>
                     <button type="button"><VideoIcon /><span>{locale === "ru" ? "Видеозвонок" : "Video call"}</span></button>
                     <button type="button"><BellIcon /><span>{locale === "ru" ? "Уведомления" : "Notifications"}</span></button>
-                    <button type="button"><ChecklistIcon /><span>{locale === "ru" ? "Выбор сообщений" : "Select messages"}</span></button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsChatMenuOpen(false);
+                        setIsMessageSelectMode(true);
+                      }}
+                    >
+                      <ChecklistIcon />
+                      <span>{locale === "ru" ? "Выбор сообщений" : "Select messages"}</span>
+                    </button>
                     <button type="button"><PinIcon /><span>{locale === "ru" ? "Закрепить сообщение" : "Pin message"}</span></button>
                     <button type="button"><UserIcon /><span>{locale === "ru" ? "Блокировать/разблокировать" : "Block/unblock"}</span></button>
                     <button type="button" className="chat-panel__menu-danger"><ArchiveIcon /><span>{locale === "ru" ? "Удалить чат" : "Delete chat"}</span></button>
@@ -1347,6 +1780,18 @@ export function ChatPage(props: ChatPageProps) {
             </button>
           </div>
         ) : null}
+        {isMessageSelectMode ? (
+          <div className="message-select-toolbar" role="status">
+            <span>
+              {locale === "ru"
+                ? `Выбрано: ${selectedMessageIds.length}`
+                : `Selected: ${selectedMessageIds.length}`}
+            </span>
+            <button type="button" onClick={clearMessageSelectionMode}>
+              {locale === "ru" ? "Отмена" : "Cancel"}
+            </button>
+          </div>
+        ) : null}
 
         <div className="messages">
           {activeChat ? (
@@ -1357,7 +1802,28 @@ export function ChatPage(props: ChatPageProps) {
                 const isFirstInSeries = !prev || prev.sender !== message.sender;
                 const isLastInSeries = !next || next.sender !== message.sender;
                 const dayLabel = messageDateLabel(message, prev);
-                const isEmojiOnly = isEmojiOnlyText(message.text) && !message.preview;
+                const isEmojiOnly = isEmojiOnlyText(message.text) && !message.preview && !message.sticker;
+                const stickerNode =
+                  message.sticker && !message.isDeleted ? (
+                    isVideoAssetUrl(message.sticker.assetUrl) ? (
+                      <video
+                        src={normalizeLocalMediaUrl(message.sticker.assetUrl)}
+                        className={`message__sticker${message.sticker.animated ? " message__sticker--animated" : ""}`}
+                        muted
+                        autoPlay
+                        loop
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img
+                        src={normalizeLocalMediaUrl(message.sticker.assetUrl)}
+                        alt={message.sticker.label}
+                        className={`message__sticker${message.sticker.animated ? " message__sticker--animated" : ""}`}
+                        loading="lazy"
+                      />
+                    )
+                  ) : null;
                 const disclosureBadge = message.disclosure ? (
                   <span
                     className="message__disclosure-badge"
@@ -1385,6 +1851,7 @@ export function ChatPage(props: ChatPageProps) {
                   )
                 ) : null;
                 const canInteract = !message.isTombstone && !message.isDeleted && activeChatId;
+                const isMessageActive = hoveredMessageId === message.id || selectedMessageIds.includes(message.id);
                 const reactionRow = message.reactions?.length ? (
                   <div className="message__reactions">
                     {message.reactions.map((reaction) => (
@@ -1410,8 +1877,8 @@ export function ChatPage(props: ChatPageProps) {
                     <button type="button" className="message__action-btn" onClick={() => onSetReplyTo(message)}>
                       {locale === "ru" ? "Ответ" : "Reply"}
                     </button>
-                    <button type="button" className="message__action-btn" onClick={() => void onToggleReaction(activeChatId!, message.id, "👍")}>
-                      👍
+                    <button type="button" className="message__action-btn" onClick={() => void onToggleReaction(activeChatId!, message.id, "❤️")}>
+                      ❤️
                     </button>
                     {message.sender === "me" ? (
                       <>
@@ -1437,17 +1904,63 @@ export function ChatPage(props: ChatPageProps) {
                     ) : null}
                   </div>
                 ) : null;
+                const quickReactionSlot = canInteract ? (
+                  <div className="message__quick-reaction-slot">
+                    <button
+                      type="button"
+                      className="message__quick-heart"
+                      onClick={() => void onToggleReaction(activeChatId!, message.id, "❤️")}
+                      aria-label={locale === "ru" ? "Поставить сердце" : "React with heart"}
+                    >
+                      ❤️
+                    </button>
+                    <div className="message__quick-reactions" role="toolbar" aria-label={locale === "ru" ? "Быстрые реакции" : "Quick reactions"}>
+                      {["❤️", "👍", "😂", "😮", "😢", "😡"].map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          className="message__quick-reaction-btn"
+                          onClick={() => void onToggleReaction(activeChatId!, message.id, emoji)}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null;
                 return (
-                  <div key={message.id} className="message-wrap">
+                  <div
+                    key={message.id}
+                    className={`message-wrap ${isMessageActive ? "message-wrap--active" : ""}`}
+                    onMouseEnter={() => setHoveredMessageId(message.id)}
+                    onMouseLeave={() => setHoveredMessageId((prev) => (prev === message.id ? null : prev))}
+                  >
                     {dayLabel ? <div className="message-day-sep">{dayLabel}</div> : null}
                     {message.sender === "me" ? (
-                      <article className={`message message--me ${message.isTombstone ? "message--tombstone" : ""} ${message.isDeleted ? "message--deleted" : ""}`}>
+                      <article
+                        className={`message message--me ${message.isTombstone ? "message--tombstone" : ""} ${message.isDeleted ? "message--deleted" : ""} ${message.sticker ? "message--sticker-only" : ""} ${isMessageActive ? "message--active" : ""}`}
+                        onClick={() => {
+                          if (isMessageSelectMode) toggleMessageSelection(message.id);
+                        }}
+                      >
+                        {isMessageSelectMode ? (
+                          <button
+                            type="button"
+                            className={`message__selector message__selector--me ${selectedMessageIds.includes(message.id) ? "message__selector--checked" : ""}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleMessageSelection(message.id);
+                            }}
+                            aria-label={locale === "ru" ? "Выбрать сообщение" : "Select message"}
+                          />
+                        ) : null}
                         {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
                         {replyPreview}
                         <div className="message__body-row">
-                          <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>
+                          {stickerNode ?? <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>}
                           {disclosureBadge}
                         </div>
+                        {quickReactionSlot}
                         {mediaNode}
                         {actionBar}
                         {reactionRow}
@@ -1458,13 +1971,30 @@ export function ChatPage(props: ChatPageProps) {
                         <div className="message-row__avatar-slot">
                           {isLastInSeries ? <span className="message-row__avatar">{senderInitial(message.author)}</span> : null}
                         </div>
-                        <article className={`message ${message.isTombstone ? "message--tombstone" : ""} ${message.isDeleted ? "message--deleted" : ""}`}>
+                        <article
+                          className={`message ${message.isTombstone ? "message--tombstone" : ""} ${message.isDeleted ? "message--deleted" : ""} ${message.sticker ? "message--sticker-only" : ""} ${isMessageActive ? "message--active" : ""}`}
+                          onClick={() => {
+                            if (isMessageSelectMode) toggleMessageSelection(message.id);
+                          }}
+                        >
+                          {isMessageSelectMode ? (
+                            <button
+                              type="button"
+                              className={`message__selector ${selectedMessageIds.includes(message.id) ? "message__selector--checked" : ""}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleMessageSelection(message.id);
+                              }}
+                              aria-label={locale === "ru" ? "Выбрать сообщение" : "Select message"}
+                            />
+                          ) : null}
                           {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
                           {replyPreview}
                           <div className="message__body-row">
-                            <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>
+                            {stickerNode ?? <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>}
                             {disclosureBadge}
                           </div>
+                          {quickReactionSlot}
                           {mediaNode}
                           {actionBar}
                           {reactionRow}
@@ -1516,17 +2046,188 @@ export function ChatPage(props: ChatPageProps) {
               </p>
             ) : null}
             <div className="composer__emoji-wrap" ref={emojiRef}>
-              <button type="button" className="icon-button" onClick={() => setIsEmojiOpen((prev) => !prev)} aria-label={locale === "ru" ? "Эмодзи" : "Emoji"}>
-                😊
+              <button
+                type="button"
+                className="icon-button composer__emoji-toggle"
+                onClick={() => setIsEmojiOpen((prev) => !prev)}
+                aria-label={locale === "ru" ? "Эмодзи" : "Emoji"}
+              >
+                <EmojiSmileIcon />
               </button>
               {isEmojiOpen ? (
                 <div className="composer__emoji-pop">
-                  <EmojiPicker
-                    theme={theme === "dark" ? "dark" : "light"}
-                    onEmojiClick={onEmojiPick}
-                    lazyLoadEmojis
-                    autoFocusSearch={false}
-                  />
+                  <div
+                    className="composer__picker-tabs composer__picker-tabs--embedded"
+                    onWheel={(event) => {
+                      event.preventDefault();
+                      switchPickerTabByWheel(event.deltaY);
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className={`composer__picker-tab ${pickerTab === "emoji" ? "composer__picker-tab--active" : ""}`}
+                      onClick={() => setPickerTab("emoji")}
+                      title={locale === "ru" ? "Смайлы" : "Emoji"}
+                      aria-label={locale === "ru" ? "Смайлы" : "Emoji"}
+                    >
+                      <EmojiSmileIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className={`composer__picker-tab ${pickerTab === "stickers" ? "composer__picker-tab--active" : ""}`}
+                      onClick={() => setPickerTab("stickers")}
+                      title={locale === "ru" ? "Стикеры" : "Stickers"}
+                      aria-label={locale === "ru" ? "Стикеры" : "Stickers"}
+                    >
+                      <StickerIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className={`composer__picker-tab ${pickerTab === "gifs" ? "composer__picker-tab--active" : ""}`}
+                      onClick={() => setPickerTab("gifs")}
+                      title="GIF"
+                      aria-label="GIF"
+                    >
+                      <span className="composer__picker-gif-glyph">GIF</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`composer__picker-tab ${pickerTab === "videos" ? "composer__picker-tab--active" : ""}`}
+                      onClick={() => setPickerTab("videos")}
+                      title={locale === "ru" ? "Видео" : "Video"}
+                      aria-label={locale === "ru" ? "Видео" : "Video"}
+                    >
+                      <VideoIcon />
+                    </button>
+                    <button
+                      type="button"
+                      className="composer__open-sticker-manager composer__open-sticker-manager--icon"
+                      onClick={() => {
+                        setIsEmojiOpen(false);
+                        setIsStickerManagerOpen(true);
+                      }}
+                      title={locale === "ru" ? "Мои паки" : "My packs"}
+                      aria-label={locale === "ru" ? "Мои паки" : "My packs"}
+                    >
+                      <SettingsIcon />
+                    </button>
+                  </div>
+                  <div className="composer__picker-shared-header composer__picker-shared-header--floating">
+                    <div className="composer__picker-search">
+                      <SearchIcon />
+                      <input
+                        type="text"
+                        className="composer__sticker-search"
+                        value={pickerSearch}
+                        onChange={(event) => setPickerSearch(event.target.value)}
+                        placeholder={locale === "ru" ? "Поиск" : "Search"}
+                      />
+                    </div>
+                  </div>
+                  {pickerTab === "emoji" ? (
+                    <>
+                      <EmojiPicker
+                        theme={theme === "dark" ? "dark" : "light"}
+                        width="100%"
+                        height="100%"
+                        emojiData={emojiPickerLocaleData}
+                        categories={emojiPickerCategoryConfig}
+                        skinTonesDisabled
+                        previewConfig={{ showPreview: false, defaultCaption: emojiPickerConfig.previewTitle }}
+                        suggestedEmojisMode={emojiPickerConfig.suggestedEmojisMode}
+                        onEmojiClick={onEmojiPick}
+                        lazyLoadEmojis
+                        autoFocusSearch={false}
+                      />
+                    </>
+                  ) : pickerTab === "stickers" ? (
+                    <div className="composer__sticker-panel">
+                      <div className="composer__sticker-pack-tabs">
+                        {stickerMessagePacksWithFallback.map((pack) => (
+                          (() => {
+                            const previewSticker = pickPackPreviewSticker(pack);
+                            return (
+                          <button
+                            key={pack.id}
+                            type="button"
+                            className={
+                              activeStickerPickerPack?.id === pack.id
+                                ? "composer__sticker-pack-tab composer__sticker-pack-tab--active"
+                                : "composer__sticker-pack-tab"
+                            }
+                            onClick={() => setEmojiPickerStickerPackId(pack.id)}
+                            title={pack.title}
+                          >
+                            {previewSticker?.assetUrl ? (
+                              <img
+                                src={previewSticker.assetUrl}
+                                alt={pack.title}
+                                className="composer__sticker-pack-preview"
+                                loading="lazy"
+                              />
+                            ) : (
+                              pack.title
+                            )}
+                          </button>
+                            );
+                          })()
+                        ))}
+                      </div>
+                      <div className="composer__sticker-panel-body">
+                        <div className="composer__sticker-grid">
+                        {visiblePickerStickers.map((sticker) => (
+                          <button
+                            key={sticker.id}
+                            type="button"
+                            className="composer__sticker-btn"
+                            title={sticker.label}
+                            aria-label={sticker.label}
+                            onClick={() => sendStickerMessage(sticker)}
+                          >
+                            <img src={sticker.assetUrl} alt={sticker.label} loading="lazy" />
+                          </button>
+                        ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : pickerTab === "gifs" ? (
+                    <div className="composer__sticker-panel">
+                      <div className="composer__sticker-panel-body">
+                      <div className="composer__media-grid">
+                        {visibleGifs.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="composer__media-btn"
+                            title={locale === "ru" ? item.labelRu : item.labelEn}
+                            onClick={() => sendGifPreset(item.url, locale === "ru" ? item.labelRu : item.labelEn)}
+                          >
+                            <img src={item.url} alt={locale === "ru" ? item.labelRu : item.labelEn} loading="lazy" />
+                            <span>{locale === "ru" ? item.labelRu : item.labelEn}</span>
+                          </button>
+                        ))}
+                      </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="composer__sticker-panel">
+                      <div className="composer__sticker-panel-body">
+                      <div className="composer__video-list">
+                        {visibleVideos.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="composer__video-btn"
+                            onClick={() => sendVideoPreset(item.url, locale === "ru" ? item.labelRu : item.labelEn)}
+                          >
+                            <video src={item.url} className="composer__video-preview" muted autoPlay loop playsInline preload="metadata" />
+                            <strong>{locale === "ru" ? item.labelRu : item.labelEn}</strong>
+                          </button>
+                        ))}
+                      </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -1960,6 +2661,189 @@ export function ChatPage(props: ChatPageProps) {
             </div>
           ) : null}
         </aside>
+      ) : null}
+      {isStickerManagerOpen ? (
+        <div
+          className="confirm-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={locale === "ru" ? "Менеджер стикерпаков" : "Sticker packs manager"}
+          onClick={() => setIsStickerManagerOpen(false)}
+        >
+          <div className="sticker-manager" onClick={(event) => event.stopPropagation()}>
+            <header className="sticker-manager__header">
+              <h4>{locale === "ru" ? "Менеджер стикерпаков" : "Sticker packs manager"}</h4>
+              <button type="button" className="icon-button" onClick={() => setIsStickerManagerOpen(false)}>
+                ×
+              </button>
+            </header>
+            <div className="sticker-manager__toolbar">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={stickerOnlyMine}
+                  onChange={(event) => setStickerOnlyMine(event.target.checked)}
+                />
+                {locale === "ru" ? "Только мои (без system)" : "Only mine (exclude system)"}
+              </label>
+              <div className="sticker-manager__tabs" role="tablist" aria-label={locale === "ru" ? "Вкладки менеджера" : "Manager tabs"}>
+                <button
+                  type="button"
+                  className={stickerManagerTab === "packs" ? "sticker-manager__tab sticker-manager__tab--active" : "sticker-manager__tab"}
+                  role="tab"
+                  aria-selected={stickerManagerTab === "packs"}
+                  onClick={() => setStickerManagerTab("packs")}
+                >
+                  {locale === "ru" ? "Паки" : "Packs"}
+                </button>
+                <button
+                  type="button"
+                  className={stickerManagerTab === "stickers" ? "sticker-manager__tab sticker-manager__tab--active" : "sticker-manager__tab"}
+                  role="tab"
+                  aria-selected={stickerManagerTab === "stickers"}
+                  onClick={() => setStickerManagerTab("stickers")}
+                >
+                  {locale === "ru" ? "Стикеры" : "Stickers"}
+                </button>
+              </div>
+            </div>
+            <div className="sticker-manager__create">
+              <input
+                value={newPackTitle}
+                onChange={(event) => setNewPackTitle(event.target.value)}
+                placeholder={locale === "ru" ? "Название нового пака" : "New pack title"}
+              />
+              <input value={newPackSlug} onChange={(event) => setNewPackSlug(event.target.value)} placeholder="slug (optional)" />
+              <button type="button" onClick={() => void submitNewStickerPack()}>
+                {locale === "ru" ? "Создать пак" : "Create pack"}
+              </button>
+            </div>
+            <div className="sticker-manager__create">
+              <select value={newStickerPackId} onChange={(event) => setNewStickerPackId(event.target.value)}>
+                <option value="">{locale === "ru" ? "Выбери пак" : "Select pack"}</option>
+                {stickerPacks.filter((pack) => !pack.isSystem).map((pack) => (
+                  <option key={pack.id} value={pack.id}>
+                    {pack.title}
+                  </option>
+                ))}
+              </select>
+              <input value={newStickerCode} onChange={(event) => setNewStickerCode(event.target.value)} placeholder={locale === "ru" ? "Код стикера" : "Sticker code"} />
+              <input value={newStickerLabel} onChange={(event) => setNewStickerLabel(event.target.value)} placeholder={locale === "ru" ? "Подпись" : "Label"} />
+              <input
+                value={newStickerAssetUrl}
+                onChange={(event) => setNewStickerAssetUrl(event.target.value)}
+                placeholder={locale === "ru" ? "URL изображения (/stickers/...)" : "Image URL (/stickers/...)"}
+              />
+              <select value={newStickerRender} onChange={(event) => setNewStickerRender(event.target.value === "inline" ? "inline" : "large")}>
+                <option value="large">{locale === "ru" ? "Стикер (отдельное сообщение)" : "Sticker (standalone message)"}</option>
+                <option value="inline">{locale === "ru" ? "Эмодзи в текст" : "Emoji in text"}</option>
+              </select>
+              <label className="sticker-manager__checkbox">
+                <input type="checkbox" checked={newStickerAnimated} onChange={(event) => setNewStickerAnimated(event.target.checked)} />
+                <span>{locale === "ru" ? "Анимированный" : "Animated"}</span>
+              </label>
+              <input value={newStickerTags} onChange={(event) => setNewStickerTags(event.target.value)} placeholder={locale === "ru" ? "Теги через запятую" : "Comma tags"} />
+              <button type="button" onClick={() => void submitNewSticker()}>
+                {locale === "ru" ? "Добавить стикер" : "Add sticker"}
+              </button>
+            </div>
+            <div className="sticker-manager__list">
+              {stickerManagerTab === "packs"
+                ? managedStickerPacks.map((pack) => (
+                    <article key={pack.id} className="sticker-manager__pack">
+                      <div className="sticker-manager__pack-head">
+                        <strong>{pack.title}</strong>
+                        {!pack.isSystem ? (
+                          <StickerManagerRowActions
+                            menuId={`pack-${pack.id}`}
+                            locale={locale}
+                            openMenuId={stickerManagerRowMenuId}
+                            setOpenMenuId={setStickerManagerRowMenuId}
+                            menuRef={stickerManagerMenuRef}
+                            deleteLabel={locale === "ru" ? "Удалить пак" : "Delete pack"}
+                            onEdit={() => {
+                              setEditingPackId(pack.id);
+                              setEditingPackTitle(pack.title);
+                            }}
+                            onDelete={() => void removePack(pack.id)}
+                          />
+                        ) : null}
+                      </div>
+                      {!pack.isSystem && editingPackId === pack.id ? (
+                        <div className="sticker-manager__inline-editor">
+                          <input
+                            value={editingPackTitle}
+                            onChange={(event) => setEditingPackTitle(event.target.value)}
+                            placeholder={locale === "ru" ? "Новое имя пака" : "New pack title"}
+                          />
+                          <button type="button" onClick={() => void submitPackRename()}>
+                            {locale === "ru" ? "Переименовать" : "Rename"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPackId("");
+                              setEditingPackTitle("");
+                            }}
+                          >
+                            {locale === "ru" ? "Отмена" : "Cancel"}
+                          </button>
+                        </div>
+                      ) : null}
+                    </article>
+                  ))
+                : managedStickerPacks.flatMap((pack) =>
+                    pack.stickers.map((sticker) => (
+                      <div key={sticker.id} className="sticker-manager__sticker-row">
+                        <div className="sticker-manager__sticker-main">
+                          <span>{sticker.code}</span>
+                          <small>
+                            {pack.title} - {sticker.label}
+                          </small>
+                          {!pack.isSystem ? (
+                            <StickerManagerRowActions
+                              menuId={`sticker-${sticker.id}`}
+                              locale={locale}
+                              openMenuId={stickerManagerRowMenuId}
+                              setOpenMenuId={setStickerManagerRowMenuId}
+                              menuRef={stickerManagerMenuRef}
+                              deleteLabel={locale === "ru" ? "Удалить" : "Delete"}
+                              onEdit={() => {
+                                setEditingStickerId(sticker.id);
+                                setEditingStickerLabel(sticker.label);
+                              }}
+                              onDelete={() => void removeSticker(sticker.id)}
+                            />
+                          ) : null}
+                        </div>
+                        {!pack.isSystem && editingStickerId === sticker.id ? (
+                          <div className="sticker-manager__inline-editor">
+                            <input
+                              value={editingStickerLabel}
+                              onChange={(event) => setEditingStickerLabel(event.target.value)}
+                              placeholder={locale === "ru" ? "Новая подпись" : "New label"}
+                            />
+                            <button type="button" onClick={() => void submitStickerRename()}>
+                              {locale === "ru" ? "Сохранить" : "Save"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingStickerId("");
+                                setEditingStickerLabel("");
+                              }}
+                            >
+                              {locale === "ru" ? "Отмена" : "Cancel"}
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+            </div>
+            {stickerToast ? <p className="sticker-manager__toast">{stickerToast}</p> : null}
+          </div>
+        </div>
       ) : null}
       {mediaPreviewUrl ? (
         <div
