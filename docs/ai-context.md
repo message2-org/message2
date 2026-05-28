@@ -94,6 +94,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `chat-offline-ux` | `in_progress` | `cursor:chat-offline-ux` | `2026-05-27` | `apps/web/src` ChatPage network UX | `feature/chat-offline-ux` | replace polling badge with action-based offline UX |
 | `track-b-web-default-emoji-sticker-seed` | `in_progress` | `cursor:emoji-sticker-seed` | `2026-05-27` | `apps/web/src`, `services/messaging`, `packages/contracts` emoji/sticker API | `feature/track-b-web-default-emoji-sticker-seed` | seed default emoji + big and inline sticker presets |
 | `vkr-draft-pack` | `in_progress` | `cursor:vkr-draft-pack` | `2026-05-27` | `private/input`, `private/output` thesis docs/presentation drafts | `feature/vkr-draft-pack` | generate draft RPS/report/speech/slides from templates |
+| `admin-panel-parity` | `in_progress` | `cursor:admin-panel-parity` | `2026-05-28` | `apps/admin`, `services/access-audit` admin auth/bootstrap parity | `feature/admin-panel-parity` | align admin UX with web auth and document first admin login |
 
 ### Planned next (pick one track for new agents)
 

@@ -1,5 +1,3 @@
-import manifest from "../../public/emotion-assets/manifest.json";
-
 export type EmotionGifPreset = {
   id: string;
   labelEn: string;
@@ -27,8 +25,5 @@ const FALLBACK_VIDEOS: EmotionVideoPreset[] = [
   { id: "flower", labelEn: "Flower clip", labelRu: "Цветок", url: "/emotion-assets/videos/flower.mp4" }
 ];
 
-const manifestGifs = Array.isArray(manifest?.gifs) ? (manifest.gifs as EmotionGifPreset[]) : [];
-const manifestVideos = Array.isArray(manifest?.videos) ? (manifest.videos as EmotionVideoPreset[]) : [];
-
-export const EMOTION_GIF_PRESETS: EmotionGifPreset[] = manifestGifs.length ? manifestGifs : FALLBACK_GIFS;
-export const EMOTION_VIDEO_PRESETS: EmotionVideoPreset[] = manifestVideos.length ? manifestVideos : FALLBACK_VIDEOS;
+export const EMOTION_GIF_PRESETS: EmotionGifPreset[] = FALLBACK_GIFS;
+export const EMOTION_VIDEO_PRESETS: EmotionVideoPreset[] = FALLBACK_VIDEOS;
