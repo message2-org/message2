@@ -344,6 +344,26 @@ body {
   width: 100%;
 }
 
+.auth-alt-switch {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  align-self: center;
+  padding: 2px 4px 0;
+}
+
+.auth-alt-switch:hover {
+  color: var(--text);
+}
+
+.auth-alt-switch:active {
+  opacity: 0.82;
+}
+
 .input-group {
   position: relative;
   width: 100%;
@@ -351,6 +371,10 @@ body {
   border-radius: 10px;
   background: var(--soft);
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.input-group:hover:not(:focus-within) {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
 }
 
 .input-group:focus-within {
@@ -452,6 +476,32 @@ button.primary:disabled {
   color: var(--field-error);
   font-size: 13px;
   margin: 0;
+}
+
+.auth-hint-card {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--soft) 55%, transparent);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.auth-hint-title {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.auth-hint-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text);
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
 }
 
 .complaint-row {

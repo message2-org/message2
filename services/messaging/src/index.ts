@@ -414,13 +414,20 @@ app.post("/auth/register", async (req, res) => {
       return;
     }
 
-    const userCount = await prisma.user.count();
+    const bootstrapAdminRequested = req.body.bootstrapAdmin === true;
+    const adminCount = bootstrapAdminRequested
+      ? await prisma.user.count({ where: { role: "admin" } })
+      : 0;
+    if (bootstrapAdminRequested && adminCount > 0) {
+      res.status(409).json({ error: "admin already exists" });
+      return;
+    }
     const user = await prisma.user.create({
       data: {
         displayName,
         username,
         passwordHash: await hashPassword(password),
-        role: userCount === 0 && req.body.bootstrapAdmin === true ? "admin" : "user",
+        role: bootstrapAdminRequested ? "admin" : "user",
         ...(hasAvatarField ? { avatarUrl } : {})
       }
     });
@@ -445,6 +452,16 @@ app.post("/auth/register", async (req, res) => {
   } catch (error) {
     console.error("[auth/register]", error);
     res.status(500).json({ error: "failed to register user" });
+  }
+});
+
+app.get("/auth/admin-bootstrap-status", async (_req, res) => {
+  try {
+    const adminCount = await prisma.user.count({ where: { role: "admin" } });
+    res.json({ canBootstrap: adminCount === 0 });
+  } catch (error) {
+    console.error("[auth/admin-bootstrap-status]", error);
+    res.status(500).json({ error: "failed to resolve bootstrap status" });
   }
 });
 

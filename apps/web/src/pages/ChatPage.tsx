@@ -11,6 +11,7 @@ import EmojiPicker, { type EmojiClickData } from "emoji-picker-react";
 import { buildAvatarGradient, buildUserInitials } from "../lib/avatar";
 import { copy, localeOptions, Locale } from "../i18n";
 import { chatMatchesSearch } from "../search-utils";
+import { SidebarDiscovery } from "../components/SidebarDiscovery";
 import { AuthUser, ChatItem, Message, PendingAttachment, StickerItem, StickerPack, TransparencyBanner } from "../types";
 import { localizeStickerPacks } from "../lib/sticker-i18n";
 import { emojiPickerCategories, emojiPickerData, emojiPickerLabels } from "../lib/emoji-picker-locale";

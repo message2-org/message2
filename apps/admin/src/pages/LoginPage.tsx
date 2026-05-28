@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import type { AdminSession } from "../App";
 import { BrandLogo } from "../components/BrandLogo";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -12,23 +12,63 @@ type LoginPageProps = {
   onLogin: (session: AdminSession) => void;
 };
 
+type AuthMode = "login" | "bootstrap";
+
 export function LoginPage({ theme, onThemeToggle, onLogin }: LoginPageProps) {
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [canBootstrap, setCanBootstrap] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayName, setDisplayName] = useState("Administrator");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    const resolveBootstrapStatus = async () => {
+      for (const base of API_BASES) {
+        try {
+          const response = await fetch(`${base}/auth/admin-bootstrap-status`);
+          if (!response.ok) continue;
+          const body = (await response.json().catch(() => ({}))) as { canBootstrap?: boolean };
+          if (typeof body.canBootstrap !== "boolean") continue;
+          if (!cancelled) {
+            setCanBootstrap(body.canBootstrap);
+            if (!body.canBootstrap) setMode("login");
+          }
+          return;
+        } catch {
+          // Try next API base.
+        }
+      }
+    };
+    void resolveBootstrapStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (mode === "bootstrap" && password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
     setLoading(true);
     setError(null);
-    let lastError = "Login failed";
+    let lastError = mode === "login" ? "Login failed" : "Admin bootstrap failed";
     for (const base of API_BASES) {
       try {
-        const response = await fetch(`${base}/auth/login`, {
+        const endpoint = mode === "login" ? "/auth/login" : "/auth/register";
+        const payload =
+          mode === "login"
+            ? { username, password }
+            : { username, password, displayName, bootstrapAdmin: true };
+        const response = await fetch(`${base}${endpoint}`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify(payload)
         });
         const body = (await response.json().catch(() => ({}))) as {
           accessToken?: string;
@@ -37,7 +77,15 @@ export function LoginPage({ theme, onThemeToggle, onLogin }: LoginPageProps) {
           error?: string;
         };
         if (!response.ok) {
-          lastError = body.error ?? `HTTP ${response.status}`;
+          if (mode === "bootstrap" && response.status === 409) {
+            if (body.error === "admin already exists") {
+              lastError = "Administrator already exists. Use Sign in.";
+            } else {
+              lastError = "Username already exists. If admin is already created, switch to Sign in.";
+            }
+          } else {
+            lastError = body.error ?? `HTTP ${response.status}`;
+          }
           continue;
         }
         if (!body.accessToken) {
@@ -45,7 +93,7 @@ export function LoginPage({ theme, onThemeToggle, onLogin }: LoginPageProps) {
           continue;
         }
         if (body.role !== "admin") {
-          lastError = "Admin role required";
+          lastError = mode === "bootstrap" ? "Bootstrap works only if there is no administrator yet." : "Admin role required";
           continue;
         }
         onLogin({ accessToken: body.accessToken, username: body.username ?? username });
@@ -68,9 +116,27 @@ export function LoginPage({ theme, onThemeToggle, onLogin }: LoginPageProps) {
       <section className="auth-card">
         <BrandLogo className="brand-logo brand-logo--auth" theme={theme} />
         <h1>Message2 Admin</h1>
-        <p className="auth-card__subtitle">Sign in with a messaging account that has role=admin.</p>
+        <p className="auth-card__subtitle">
+          {mode === "login"
+            ? "Sign in with a messaging account that has role=admin."
+            : "Create the first administrator while no admin account exists."}
+        </p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
+          {mode === "bootstrap" ? (
+            <div className="input-group">
+              <div className="input-group__head">
+                <label htmlFor="displayName">Display name (optional)</label>
+              </div>
+              <input
+                id="displayName"
+                className="form-control"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                autoComplete="name"
+              />
+            </div>
+          ) : null}
           <div className="input-group">
             <div className="input-group__head">
               <label htmlFor="username">Username</label>
@@ -99,13 +165,50 @@ export function LoginPage({ theme, onThemeToggle, onLogin }: LoginPageProps) {
               required
             />
           </div>
+          {mode === "bootstrap" ? (
+            <div className="input-group">
+              <div className="input-group__head">
+                <label htmlFor="confirmPassword">Confirm password</label>
+              </div>
+              <input
+                id="confirmPassword"
+                className="form-control"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                required
+              />
+            </div>
+          ) : null}
 
           {error ? <p className="auth-error">{error}</p> : null}
 
           <button className="primary-button" type="submit" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? (mode === "login" ? "Signing in..." : "Creating admin...") : mode === "login" ? "Sign in" : "Create first admin"}
           </button>
+          {canBootstrap ? (
+            <button
+              type="button"
+              className="auth-alt-switch"
+              onClick={() => {
+                setError(null);
+                setMode((prev) => (prev === "login" ? "bootstrap" : "login"));
+              }}
+            >
+              {mode === "login" ? "Fresh install? Create first admin" : "Admin already exists? Sign in"}
+            </button>
+          ) : null}
         </form>
+
+        <div className="auth-hint-card">
+          <p className="auth-hint-title">Quick start</p>
+          <ul className="auth-hint-list">
+            {canBootstrap ? <li>First run: open "Create first admin" and submit once.</li> : null}
+            <li>Use "Sign in" with an account that has admin role.</li>
+            <li>Bootstrap is blocked once any admin account exists.</li>
+          </ul>
+        </div>
       </section>
     </main>
   );

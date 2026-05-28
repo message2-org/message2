@@ -46,6 +46,10 @@ function chatNameToken(name: string) {
   return name.trim().toLowerCase().replace(/\s+/g, "");
 }
 
+function asLowerText(value: unknown): string {
+  return typeof value === "string" ? value.toLowerCase() : "";
+}
+
 function isAppSystemChat(chat: ChatItem) {
   const token = chatNameToken(chat.name);
   return chat.peerUsername === "message2_bot" || token === "послание2" || token === "message2" || token === "message2bot";
@@ -93,7 +97,7 @@ export function SidebarDiscovery(props: Props) {
   const joinedGroups = useMemo(
     () =>
       joinedChannels.filter((channel) =>
-        needle ? channel.name.toLowerCase().includes(needle) : true
+        needle ? asLowerText(channel.name).includes(needle) : true
       ),
     [joinedChannels, needle]
   );
@@ -101,7 +105,7 @@ export function SidebarDiscovery(props: Props) {
   const suggestedChannels = useMemo(
     () =>
       similarChannels.filter((channel) =>
-        needle ? channel.name.toLowerCase().includes(needle) : true
+        needle ? asLowerText(channel.name).includes(needle) : true
       ),
     [similarChannels, needle]
   );
@@ -114,8 +118,8 @@ export function SidebarDiscovery(props: Props) {
     if (!needle) return users;
     return users.filter(
       (user) =>
-        user.username.toLowerCase().includes(needle) ||
-        user.displayName.toLowerCase().includes(needle)
+        asLowerText(user.username).includes(needle) ||
+        asLowerText(user.displayName).includes(needle)
     );
   }, [needle, users]);
 
@@ -247,7 +251,7 @@ export function SidebarDiscovery(props: Props) {
                           {getChatInitials(user.displayName || user.username)}
                         </span>
                         <span className="discovery-channel-row__main">
-                          <span className="discovery-channel-row__name">{user.displayName}</span>
+                          <span className="discovery-channel-row__name">{user.displayName || user.username}</span>
                           <span className="discovery-channel-row__meta">
                             {openingUserId === user.id ? t.discoveryOpeningChat : `@${user.username}`}
                           </span>
