@@ -90,6 +90,10 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `track-b-web-session-restore` | `done` | `cursor:web-session-restore` | `2026-05-26` | `apps/web/src/auth` | `feature/track-b-web-session-restore` | PR #3 merged |
 | `track-c-e2ee-media-wire` | `done` | `cursor:track-c-e2ee-media` | `2026-05-26` | `apps/web/src/e2ee`, `services/media`, `packages/contracts` | `feature/track-c-e2ee-media-wire` | PR #7 merged |
 | `chore-untrack-node-modules` | `done` | `cursor:chore-untrack-node-modules` | `2026-05-26` | repo git index | `feature/chore-untrack-node-modules` | PR #8 merged; `git ls-files -ci` empty |
+| `web-system-chat-avatars` | `in_progress` | `cursor:web-system-avatars` | `2026-05-27` | `apps/web/src` system chats avatars | `feature/web-system-chat-avatars` | system chat icons + gradients |
+| `chat-offline-ux` | `in_progress` | `cursor:chat-offline-ux` | `2026-05-27` | `apps/web/src` ChatPage network UX | `feature/chat-offline-ux` | replace polling badge with action-based offline UX |
+| `track-b-web-default-emoji-sticker-seed` | `in_progress` | `cursor:emoji-sticker-seed` | `2026-05-27` | `apps/web/src`, `services/messaging`, `packages/contracts` emoji/sticker API | `feature/track-b-web-default-emoji-sticker-seed` | seed default emoji + big and inline sticker presets |
+| `vkr-draft-pack` | `in_progress` | `cursor:vkr-draft-pack` | `2026-05-27` | `private/input`, `private/output` thesis docs/presentation drafts | `feature/vkr-draft-pack` | generate draft RPS/report/speech/slides from templates |
 
 ### Planned next (pick one track for new agents)
 

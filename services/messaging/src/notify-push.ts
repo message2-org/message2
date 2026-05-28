@@ -12,11 +12,16 @@ export function previewTextFromCipher(cipherText: string): string {
       text?: string;
       fileName?: string;
       previewType?: string;
+      label?: string;
     };
     if (parsed.kind === "attachment") {
       if (typeof parsed.text === "string" && parsed.text.trim()) return parsed.text.trim().slice(0, 160);
       if (typeof parsed.fileName === "string" && parsed.fileName.trim()) return parsed.fileName.trim();
       return "Attachment";
+    }
+    if (parsed.kind === "sticker") {
+      if (typeof parsed.label === "string" && parsed.label.trim()) return parsed.label.trim().slice(0, 160);
+      return "Sticker";
     }
   } catch {
     // plain text

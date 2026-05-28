@@ -53,6 +53,13 @@ export type Message = {
   text: string;
   time: string;
   createdAt?: string;
+  kind?: string;
+  sticker?: {
+    stickerId: string;
+    assetUrl: string;
+    label: string;
+    animated?: boolean;
+  };
   mediaId?: string;
   preview?: string;
   previewType?: "image" | "video" | "audio" | "file";
@@ -127,4 +134,26 @@ export type PendingAttachment = {
     mime: string;
     size: number;
   };
+};
+
+export type StickerItem = {
+  id: string;
+  packId: string;
+  code: string;
+  label: string;
+  render: "large" | "inline";
+  assetUrl?: string;
+  animated?: boolean;
+  tags: string[];
+  sortOrder: number;
+};
+
+export type StickerPack = {
+  id: string;
+  slug: string;
+  title: string;
+  description?: string;
+  visibility: "public" | "private" | "corporate";
+  isSystem: boolean;
+  stickers: StickerItem[];
 };

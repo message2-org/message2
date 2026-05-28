@@ -1788,6 +1788,10 @@ body {
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 4px;
+  opacity: 0;
+  transform: translateY(3px);
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
 }
 
 .message__action-btn {
@@ -1809,6 +1813,146 @@ body {
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 4px;
+}
+
+.message--active .message__actions,
+.message-wrap:hover .message__actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.message__quick-reactions {
+  position: absolute;
+  right: -34px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.message__quick-reaction-slot:hover .message__quick-reactions,
+.message--active .message__quick-reactions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.message__quick-reaction-slot {
+  position: absolute;
+  right: -34px;
+  bottom: 14px;
+  display: grid;
+  place-items: center;
+}
+
+.message__quick-heart {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--panel) 92%, var(--soft));
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 140ms ease, transform 140ms ease;
+  transition-delay: 320ms;
+}
+
+.message-wrap:hover .message__quick-heart,
+.message--active .message__quick-heart {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.message__quick-reaction-slot:hover .message__quick-heart {
+  opacity: 0;
+  pointer-events: none;
+  transition-delay: 0ms;
+}
+
+.message__quick-reaction-btn {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--panel) 92%, var(--soft));
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.message-select-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+  font-size: 12px;
+}
+
+.message-select-toolbar button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.message__selector {
+  position: absolute;
+  left: -26px;
+  top: 10px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: transparent;
+  padding: 0;
+}
+
+.message__selector--me {
+  right: -26px;
+  left: auto;
+}
+
+.message__selector--checked {
+  background: var(--accent);
+  box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--panel) 70%, white);
+}
+
+.message--sticker-only {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px;
+  max-width: min(220px, 75vw);
+}
+
+.message--sticker-only .message__body-row {
+  margin: 0;
+}
+
+.message--sticker-only .message__author,
+.message--sticker-only .message__reply,
+.message--sticker-only .message__actions {
+  margin-left: 4px;
 }
 
 .message__reaction {
@@ -2154,6 +2298,12 @@ body {
   border-radius: 16px;
   padding: 10px 12px;
   background: var(--panel);
+  position: relative;
+}
+
+.message--active {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
 .message-row {
@@ -2357,11 +2507,739 @@ body {
   position: relative;
 }
 
+.composer__emoji-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, var(--text) 88%, var(--accent));
+}
+
+.composer__emoji-toggle svg {
+  width: 21px;
+  height: 21px;
+  stroke-width: 2;
+}
+
 .composer__emoji-pop {
   position: absolute;
   left: 0;
   bottom: calc(100% + 8px);
   z-index: 30;
+  display: grid;
+  gap: 0;
+  width: min(350px, 86vw);
+  height: min(400px, 68vh);
+}
+
+.composer__picker-tabs {
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.composer__picker-tabs--embedded {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 10px;
+  z-index: 35;
+  border-radius: 10px 10px 0 0;
+  padding: 6px;
+  box-shadow: none;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+}
+
+.composer__picker-tab {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 120ms ease;
+}
+
+.composer__picker-tab--active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  color: var(--text);
+}
+
+.composer__picker-tab:hover,
+.composer__open-sticker-manager--icon:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+
+.composer__picker-tab:active,
+.composer__open-sticker-manager--icon:active {
+  transform: scale(0.96);
+}
+
+.composer__picker-tab-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.composer__picker-tab-text {
+  display: none;
+}
+
+.composer__picker-tab svg,
+.composer__open-sticker-manager--icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.composer__picker-gif-glyph {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+
+.composer__open-sticker-manager--icon {
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer__emoji-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.composer__emoji-chip-grid--inline {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 8px;
+}
+
+.composer__emoji-chip {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 90%, var(--soft));
+  color: var(--text);
+  font-size: 21px;
+  line-height: 1;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.composer__emoji-chip:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+}
+
+.composer__emoji-pop {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 84%, transparent) transparent;
+}
+
+.composer__emoji-pop .epr-body,
+.composer__emoji-pop .epr-emoji-list,
+.composer__emoji-pop .EmojiPickerReact {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 84%, transparent) transparent;
+}
+
+.composer__emoji-pop .epr-body::-webkit-scrollbar,
+.composer__emoji-pop .epr-emoji-list::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.composer__emoji-pop .epr-body::-webkit-scrollbar-track,
+.composer__emoji-pop .epr-emoji-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.composer__emoji-pop .epr-body::-webkit-scrollbar-thumb,
+.composer__emoji-pop .epr-emoji-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 84%, transparent);
+}
+
+.composer__emoji-pop .epr-body::-webkit-scrollbar-thumb:hover,
+.composer__emoji-pop .epr-emoji-list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 92%, var(--text));
+}
+
+.composer__sticker-pack-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.composer__sticker-panel {
+  border: 1px solid var(--border);
+  border-radius: 0 0 12px 12px;
+  background: var(--panel);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--bg) 55%, #000 45%);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 90px;
+  height: calc(min(400px, 68vh) - 90px);
+  overflow: hidden;
+  border-top: none;
+}
+
+.composer__sticker-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 84%, transparent) transparent;
+}
+
+.composer__sticker-panel-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.composer__sticker-panel-body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 84%, transparent);
+}
+
+.composer__picker-shared-header {
+  min-height: 40px;
+  display: grid;
+  align-items: center;
+}
+
+.composer__picker-shared-header--floating {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 52px;
+  z-index: 35;
+}
+
+.composer__picker-search {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--soft);
+  color: var(--muted);
+  padding: 0 10px;
+  height: 36px;
+  border-top: none;
+}
+
+.composer__picker-search svg {
+  width: 13px;
+  height: 13px;
+}
+
+.composer__media-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+
+.composer__media-btn {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 92%, var(--soft));
+  color: var(--text);
+  padding: 4px;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.composer__media-btn img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.composer__media-btn span {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 0 2px 2px;
+}
+
+.composer__video-list {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.composer__video-btn {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 92%, var(--soft));
+  color: var(--text);
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+}
+
+.composer__video-preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  background: #0f1014;
+}
+
+.composer__video-btn small {
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer__emoji-pop .EmojiPickerReact .epr-header {
+  position: relative;
+  padding-bottom: 0;
+  min-height: 0;
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.composer__emoji-pop .EmojiPickerReact {
+  margin-top: 90px;
+  height: calc(min(400px, 68vh) - 90px) !important;
+  font-size: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.composer__emoji-pop .EmojiPickerReact .epr-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.composer__emoji-pop .EmojiPickerReact .epr_q53mwh.epr_-8ygbw8.epr_346qu6.epr_-lzq3oa,
+.composer__emoji-pop .EmojiPickerReact .epr-skin-tones,
+.composer__emoji-pop .EmojiPickerReact [aria-label*="Skin tone"] {
+  display: none !important;
+}
+
+.composer__emoji-pop .EmojiPickerReact .epr-category-nav {
+  margin-top: 0 !important;
+  min-height: 32px;
+}
+
+.composer__emoji-pop .EmojiPickerReact [role="tablist"] button {
+  transform: scale(0.9);
+}
+
+.composer__emoji-pop .EmojiPickerReact [role="tablist"] {
+  gap: 2px;
+}
+
+.composer__emoji-pop .EmojiPickerReact [class*="category-label"],
+.composer__emoji-pop .EmojiPickerReact [class*="categoryLabel"] {
+  font-size: 11px !important;
+}
+
+.composer__emoji-pop .EmojiPickerReact [class*="emoji"][class*="button"] {
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.composer__emoji-pop .EmojiPickerReact [class*="emoji"][class*="button"] span,
+.composer__emoji-pop .EmojiPickerReact [class*="emoji"][class*="button"] img {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.composer__emoji-pop .EmojiPickerReact .epr_q53mwh.epr_vl50xg.epr_-3yva2a.epr_c90x4z.epr_-sisw4f {
+  display: none !important;
+}
+
+.composer__sticker-search {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  padding: 0;
+  min-width: 0;
+}
+
+.composer__sticker-search:focus {
+  outline: none;
+}
+
+.composer__sticker-pack-tab {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.composer__sticker-pack-tab--active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  color: var(--text);
+}
+
+.composer__sticker-pack-preview {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.composer__sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.composer__sticker-btn {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 92%, var(--soft));
+  padding: 6px;
+  cursor: pointer;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.composer__sticker-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+
+.composer__sticker-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.message__sticker {
+  width: min(180px, 70vw);
+  height: auto;
+  display: block;
+}
+
+.message__sticker--animated {
+  animation: message-sticker-pop 420ms ease;
+}
+
+@keyframes message-sticker-pop {
+  0% {
+    transform: scale(0.82);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.sticker-manager__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.composer__emoji-chip--large {
+  font-size: 26px;
+  padding: 7px 9px;
+}
+
+.composer__sticker-admin {
+  display: grid;
+  gap: 6px;
+}
+
+.composer__sticker-admin-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.composer__sticker-admin-row input,
+.composer__sticker-admin-row select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 8px;
+  min-width: 0;
+  flex: 1 1 120px;
+}
+
+.composer__sticker-admin-row button {
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.composer__open-sticker-manager {
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  color: var(--text);
+  font-size: 12px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sticker-manager {
+  width: min(900px, 94vw);
+  max-height: 88vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--bg) 55%, #000 45%);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.sticker-manager__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sticker-manager__header h4 {
+  margin: 0;
+}
+
+.sticker-manager__toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sticker-manager__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sticker-manager__tabs {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.sticker-manager__tab {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.sticker-manager__tab--active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+
+.sticker-manager__create,
+.sticker-manager__inline-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sticker-manager__create input,
+.sticker-manager__create select,
+.sticker-manager__inline-editor input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 8px;
+  flex: 1 1 130px;
+  min-width: 0;
+}
+
+.sticker-manager__create button,
+.sticker-manager__inline-editor button {
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.sticker-manager__list {
+  display: grid;
+  gap: 10px;
+}
+
+.sticker-manager__pack {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+  background: color-mix(in srgb, var(--panel) 90%, var(--soft));
+}
+
+.sticker-manager__pack-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sticker-manager__pack-head strong {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sticker-manager__pack-head span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sticker-manager__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.sticker-manager__actions-desktop {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.sticker-manager__actions-mobile {
+  display: none;
+  position: relative;
+}
+
+.sticker-manager__action-danger {
+  color: #d24b4b;
+}
+
+.sticker-manager__row-menu {
+  z-index: 4;
+}
+
+@media (max-width: 640px) {
+  .sticker-manager__actions-desktop {
+    display: none;
+  }
+
+  .sticker-manager__actions-mobile {
+    display: block;
+  }
+}
+
+.sticker-manager__stickers {
+  display: grid;
+  gap: 6px;
+}
+
+.sticker-manager__sticker-row {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.sticker-manager__sticker-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sticker-manager__sticker-main span {
+  font-size: 18px;
+}
+
+.sticker-manager__sticker-main small {
+  color: var(--muted);
+  font-size: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sticker-manager__toast {
+  position: sticky;
+  bottom: 0;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  color: var(--text);
+  font-size: 12px;
+  padding: 8px 10px;
 }
 
 .composer__clip {
