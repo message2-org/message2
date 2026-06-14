@@ -74,6 +74,12 @@ export {
   type InstanceProfileSnapshot
 } from "./deployment-profile.js";
 
+export {
+  buildManifestUrl,
+  readReleaseInfoFromEnv,
+  type ReleaseInfo
+} from "./release-info.js";
+
 export type { FcmRegisterInput, PushMessageDispatch, WebPushSubscriptionInput } from "./push.js";
 
 export {

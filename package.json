@@ -28,7 +28,10 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "media:fetch-emotions": "node scripts/fetch-emotion-media.mjs",
-    "media:import-stickers": "node scripts/import-sticker-archive.mjs"
+    "media:import-stickers": "node scripts/import-sticker-archive.mjs",
+    "distribution:build": "node scripts/build-distribution-archive.mjs",
+    "distribution:check-updates": "node scripts/check-distribution-updates.mjs",
+    "distribution:update": "node scripts/update-distribution.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

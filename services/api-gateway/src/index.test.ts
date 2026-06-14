@@ -27,3 +27,19 @@ test("public profile health reports lawful route exposed", async (t) => {
   const body = (await response.json()) as { lawfulRouteExposed: boolean };
   assert.equal(body.lawfulRouteExposed, true);
 });
+
+test("GET /version returns release metadata", async (t) => {
+  process.env.MESSAGE2_VERSION = "0.1.0-test";
+  process.env.MESSAGE2_COMMIT = "abc1234";
+  const app = createGatewayApp();
+  const server = app.listen(0);
+  t.after(() => server.close());
+
+  const port = (server.address() as { port: number }).port;
+  const response = await fetch(`http://127.0.0.1:${port}/version`);
+  assert.equal(response.status, 200);
+  const body = (await response.json()) as { version: string; commit: string; repositoryUrl: string };
+  assert.equal(body.version, "0.1.0-test");
+  assert.equal(body.commit, "abc1234");
+  assert.match(body.repositoryUrl, /message2-org\/message2/);
+});

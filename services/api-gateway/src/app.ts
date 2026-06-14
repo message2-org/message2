@@ -4,11 +4,12 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { randomUUID } from "node:crypto";
-import { readInstanceProfileFromEnv } from "@message2/contracts";
+import { readInstanceProfileFromEnv, readReleaseInfoFromEnv } from "@message2/contracts";
 
 export const createGatewayApp = () => {
   const app = express();
   const instanceProfile = readInstanceProfileFromEnv();
+  const releaseInfo = readReleaseInfoFromEnv();
   const { deploymentProfile, lawfulAccessEnabled, userTransparencyEnabled, corporateConnectivity } =
     instanceProfile;
 
@@ -43,6 +44,18 @@ export const createGatewayApp = () => {
       userTransparencyEnabled,
       corporateConnectivity,
       lawfulRouteExposed: lawfulAccessEnabled
+    })
+  );
+
+  app.get("/version", (_req, res) =>
+    res.json({
+      product: "message2",
+      version: releaseInfo.version,
+      commit: releaseInfo.commit,
+      repositoryUrl: releaseInfo.repositoryUrl,
+      defaultBranch: releaseInfo.defaultBranch,
+      manifestUrl: releaseInfo.manifestUrl,
+      updateHint: "Run pnpm distribution:check-updates from a git clone, or open distribution/README.md in the coursework archive."
     })
   );
 

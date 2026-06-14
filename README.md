@@ -18,7 +18,7 @@ Message2 (Russian locale name: "Послание2") is a modular messenger platf
 - API and services: Node.js + TypeScript (`services/*`)
 - Local/dev deployment: Docker Compose (`infra/docker`)
 
-Repository: [github.com/sun-demon/message2](https://github.com/sun-demon/message2)
+Repository: [github.com/message2-org/message2](https://github.com/message2-org/message2)
 
 ## Monorepo Structure
 
@@ -173,7 +173,8 @@ See [docs/product/client-platform-roadmap.md](docs/product/client-platform-roadm
 - [x] real push (Web Push + FCM legacy via `notifications`; set VAPID/FCM keys for production)
 - [ ] full Android client integration
 - [ ] desktop packaging (Tauri: Linux/Windows/macOS)
-- [ ] release packaging and public install guide
+- [x] release distribution archive (`pnpm distribution:build`, `docs/ops/distribution-archive.md`)
+- [ ] signed GitHub Releases for Android APK / desktop bundles
 
 ## Built With
 

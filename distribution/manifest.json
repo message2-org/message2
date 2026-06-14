@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "product": "message2",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/message2-org/message2",
+    "cloneUrl": "https://github.com/message2-org/message2.git",
+    "defaultBranch": "develop"
+  },
+  "revision": {
+    "commit": "049a1f470f1cd041756dd774fbddd1bdefbff8d3",
+    "branch": "feature/coursework-distribution-archive",
+    "committedAt": "2026-05-28T07:12:41+03:00"
+  },
+  "components": {
+    "monorepo": "0.1.0",
+    "web": "0.1.0",
+    "admin": "0.1.0",
+    "apiGateway": "0.1.0",
+    "messaging": "0.1.0",
+    "media": "0.1.0",
+    "notifications": "0.1.0",
+    "accessAudit": "0.1.0",
+    "lawfulAccess": "0.1.0",
+    "contracts": "0.1.0"
+  },
+  "update": {
+    "manifestUrl": "https://raw.githubusercontent.com/message2-org/message2/develop/distribution/manifest.json",
+    "versionEndpoint": "/version",
+    "procedure": [
+      "git fetch origin",
+      "git checkout develop && git pull origin develop",
+      "pnpm install",
+      "pnpm db:migrate:deploy",
+      "pnpm build"
+    ]
+  },
+  "generatedAt": "2026-06-10T06:43:03.572Z"
+}
