@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1000" height="1000" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="500" cy="500" r="470" fill="#2E78E8"/>
+  <path
+    fill="#F5F8FF"
+    d="M500 145L764 720L568 690L500 670L432 690L236 720L500 145Z"
+  />
+  <polygon fill="#2E78E8" points="498,165 502,165 560,680 500,660 440,680" />
+  <line x1="500" y1="170" x2="500" y2="665" stroke="#F5F8FF" stroke-width="12" stroke-linecap="round" />
+  <polygon fill="#F5F8FF" points="338,682 424,682 381,798" />
+  <polygon fill="#F5F8FF" points="576,682 662,682 619,798" />
+  <line x1="381" y1="836" x2="381" y2="1010" stroke="#F5F8FF" stroke-width="18" stroke-linecap="round" />
+  <line x1="619" y1="836" x2="619" y2="1010" stroke="#F5F8FF" stroke-width="18" stroke-linecap="round" />
+</svg>

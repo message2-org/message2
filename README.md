@@ -18,11 +18,12 @@ Message2 (Russian locale name: "Послание2") is a modular messenger platf
 - API and services: Node.js + TypeScript (`services/*`)
 - Local/dev deployment: Docker Compose (`infra/docker`)
 
-Repository: [github.com/sun-demon/message2](https://github.com/sun-demon/message2)
+Repository: [github.com/message2-org/message2](https://github.com/message2-org/message2)
 
 ## Monorepo Structure
 
 - `apps/web` - React web messenger (reference client)
+- `apps/site` - product landing + downloads catalog (RU/EN, light/dark)
 - `apps/admin` - instance admin / compliance console
 - `apps/android` - native Android client (Kotlin + Compose, stub)
 - `apps/desktop` / `apps/ios` - not started; roadmap in `docs/product/client-platform-roadmap.md`

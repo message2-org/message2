@@ -12,6 +12,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Monorepo: `pnpm` workspace.
 - Agent onboarding: root `AGENTS.md`; living status in this file; immutable topic in `.cursor/rules/coursework-context.mdc`.
 - Web client: `apps/web` (React + TypeScript + Vite) — **reference messenger** for API/WS integration.
+- Product landing / downloads: `apps/site` (static Vite, RU/EN, theme, `releases.json`) — served at `/` on every instance.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
 - Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
@@ -95,6 +96,8 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `track-b-web-default-emoji-sticker-seed` | `in_progress` | `cursor:emoji-sticker-seed` | `2026-05-27` | `apps/web/src`, `services/messaging`, `packages/contracts` emoji/sticker API | `feature/track-b-web-default-emoji-sticker-seed` | seed default emoji + big and inline sticker presets |
 | `vkr-draft-pack` | `in_progress` | `cursor:vkr-draft-pack` | `2026-05-27` | `private/input`, `private/output` thesis docs/presentation drafts | `feature/vkr-draft-pack` | generate draft RPS/report/speech/slides from templates |
 | `admin-panel-parity` | `in_progress` | `cursor:admin-panel-parity` | `2026-05-28` | `apps/admin`, `services/access-audit` admin auth/bootstrap parity | `feature/admin-panel-parity` | align admin UX with web auth and document first admin login |
+| `track-d-android-ui-shell` | `in_progress` | `cursor:android-ui-shell` | `2026-06-14` | `apps/android` Compose UI theme, auth, chat list, chat mock | `feature/track-d-android-ui-shell` | Phase 1: web-aligned design system + navigation shell |
+| `site-landing-distribution` | `in_progress` | `cursor:site-landing` | `2026-06-17` | `apps/site`, `infra/nginx`, deploy docs | `feature/site-landing-distribution` | landing RU/EN + downloads manifest + nginx template |
 
 ### Planned next (pick one track for new agents)
 

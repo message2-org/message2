@@ -1,0 +1,47 @@
+{
+  "officialBaseUrl": "https://message2.ru",
+  "products": [
+    {
+      "id": "web",
+      "status": "available",
+      "url": "/app/",
+      "platforms": ["web"]
+    },
+    {
+      "id": "server-linux-deb",
+      "status": "coming_soon",
+      "platforms": ["linux"]
+    },
+    {
+      "id": "server-windows",
+      "status": "coming_soon",
+      "platforms": ["windows"]
+    },
+    {
+      "id": "desktop-linux",
+      "status": "coming_soon",
+      "platforms": ["linux"]
+    },
+    {
+      "id": "desktop-windows",
+      "status": "coming_soon",
+      "platforms": ["windows"]
+    },
+    {
+      "id": "android-apk",
+      "status": "coming_soon",
+      "platforms": ["android"],
+      "officialUrl": "https://message2.ru/downloads/"
+    },
+    {
+      "id": "android-rustore",
+      "status": "coming_soon",
+      "platforms": ["android"]
+    },
+    {
+      "id": "ios",
+      "status": "coming_soon",
+      "platforms": ["ios"]
+    }
+  ]
+}

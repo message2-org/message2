@@ -14,6 +14,7 @@
     "db:reset": "pnpm infra:reset && pnpm db:migrate:deploy",
     "db:clear": "pnpm --filter @message2/messaging exec prisma migrate reset --force",
     "dev:web": "pnpm --filter @message2/web dev",
+    "dev:site": "pnpm --filter @message2/site dev",
     "dev:admin": "pnpm --filter @message2/admin dev",
     "dev:gateway": "pnpm --filter @message2/api-gateway dev",
     "dev:messaging": "pnpm --filter @message2/messaging dev",
@@ -26,6 +27,9 @@
     "dev:full": "pnpm infra:up && pnpm db:migrate:deploy && pnpm dev",
     "dev": "concurrently -n gateway,messaging,media,notifications,audit,lawful,web \"pnpm dev:gateway\" \"pnpm dev:messaging\" \"pnpm dev:media\" \"pnpm dev:notifications\" \"pnpm dev:audit\" \"pnpm dev:lawful\" \"pnpm dev:web\"",
     "build": "pnpm -r build",
+    "build:site": "pnpm --filter @message2/site build",
+    "build:web:app": "pnpm --filter @message2/web exec vite build --base=/app/",
+    "build:public-web": "pnpm build:site && pnpm build:web:app",
     "test": "pnpm -r test",
     "media:fetch-emotions": "node scripts/fetch-emotion-media.mjs",
     "media:import-stickers": "node scripts/import-sticker-archive.mjs"

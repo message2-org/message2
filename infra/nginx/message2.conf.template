@@ -1,0 +1,38 @@
+# Message2 nginx site template.
+# Install:
+#   sed "s|__MESSAGE2_ROOT__|/opt/message2|g" message2-locations.conf > /etc/nginx/snippets/message2-locations.conf
+#   sed "s|__MESSAGE2_ROOT__|/opt/message2|g" message2.conf.template > /etc/nginx/sites-available/message2
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    "" close;
+}
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name message2.ru www.message2.ru послание2.рф www.послание2.рф xn--80aaf6a3a.xn--p1ai www.xn--80aaf6a3a.xn--p1ai _;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # After certbot, uncomment to redirect named domains to HTTPS:
+    # if ($host ~* ^(message2\.ru|www\.message2\.ru|послание2\.рф|www\.послание2\.рф|xn--80aaf6a3a\.xn--p1ai|www\.xn--80aaf6a3a\.xn--p1ai)$) {
+    #     return 301 https://$host$request_uri;
+    # }
+
+    include /etc/nginx/snippets/message2-locations.conf;
+}
+
+# HTTPS (enable after certbot):
+# server {
+#     listen 443 ssl http2;
+#     listen [::]:443 ssl http2;
+#     server_name message2.ru www.message2.ru послание2.рф www.послание2.рф xn--80aaf6a3a.xn--p1ai www.xn--80aaf6a3a.xn--p1ai;
+#
+#     ssl_certificate /etc/letsencrypt/live/message2.ru/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/message2.ru/privkey.pem;
+#
+#     include /etc/nginx/snippets/message2-locations.conf;
+# }
