@@ -26,9 +26,15 @@ pnpm install
 
 Configure secrets in `infra/docker/.env` (see `infra/docker/.env.example` + production secrets).
 
+Containers mount the repo and reuse host `node_modules` — run on the host **before** `docker compose up`:
+
 ```bash
-docker compose -f infra/docker/docker-compose.yml up -d
+pnpm install
 pnpm db:migrate:deploy
+pnpm --filter @message2/messaging prisma:generate
+pnpm --filter @message2/access-audit exec prisma generate
+pnpm --filter @message2/notifications exec prisma generate
+docker compose -f infra/docker/docker-compose.yml up -d
 pnpm build:public-web
 ```
 

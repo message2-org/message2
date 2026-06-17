@@ -46,7 +46,7 @@ services:
     working_dir: /app
     volumes:
       - ../..:/app
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/api-gateway dev"
+    command: sh -c "corepack enable && pnpm --filter @message2/api-gateway dev"
     depends_on:
       messaging:
         condition: service_healthy
@@ -83,7 +83,7 @@ services:
     working_dir: /app
     volumes:
       - ../..:/app
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/messaging dev"
+    command: sh -c "corepack enable && pnpm --filter @message2/messaging dev"
     depends_on:
       postgres:
         condition: service_healthy
@@ -127,7 +127,7 @@ services:
     working_dir: /app
     volumes:
       - ../..:/app
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/media dev"
+    command: sh -c "corepack enable && pnpm --filter @message2/media dev"
     depends_on:
       minio:
         condition: service_started
@@ -155,7 +155,7 @@ services:
     working_dir: /app
     volumes:
       - ../..:/app
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/notifications exec prisma generate && pnpm --filter @message2/notifications dev"
+    command: sh -c "corepack enable && pnpm --filter @message2/notifications exec prisma generate && pnpm --filter @message2/notifications dev"
     depends_on:
       postgres:
         condition: service_healthy
@@ -186,7 +186,7 @@ services:
     working_dir: /app
     volumes:
       - ../..:/app
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/access-audit exec prisma generate && pnpm --filter @message2/access-audit dev"
+    command: sh -c "corepack enable && pnpm --filter @message2/access-audit exec prisma generate && pnpm --filter @message2/access-audit dev"
     depends_on:
       postgres:
         condition: service_healthy
@@ -217,7 +217,7 @@ services:
     working_dir: /app
     volumes:
       - ../..:/app
-    command: sh -c "corepack enable && pnpm install && pnpm --filter @message2/lawful-access dev"
+    command: sh -c "corepack enable && pnpm --filter @message2/lawful-access dev"
     depends_on:
       access-audit:
         condition: service_healthy
