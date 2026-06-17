@@ -16,7 +16,7 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
 - Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
-- **Git:** default branch **`develop`** (GitHub) @ `ab38a34`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`. **CI on `develop` is green** (workflow: `pnpm install` → Prisma generate for access-audit, notifications, messaging → `pnpm build` → `pnpm test`).
+- **Git:** default branch **`develop`** (GitHub) @ `ff7fdd3`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`. **CI on `develop` is green** (workflow: `pnpm install` → Prisma generate for access-audit, notifications, messaging → `pnpm build` → `pnpm test`).
 - **Integration:** merge to `develop` only after **green CI** on the PR (see `docs/ops/agent-coordination.md`, `docs/product/requirements.md`).
 - Current local run mode:
   - `pnpm install`
@@ -97,7 +97,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `vkr-draft-pack` | `in_progress` | `cursor:vkr-draft-pack` | `2026-05-27` | `private/input`, `private/output` thesis docs/presentation drafts | `feature/vkr-draft-pack` | generate draft RPS/report/speech/slides from templates |
 | `admin-panel-parity` | `in_progress` | `cursor:admin-panel-parity` | `2026-05-28` | `apps/admin`, `services/access-audit` admin auth/bootstrap parity | `feature/admin-panel-parity` | align admin UX with web auth and document first admin login |
 | `track-d-android-ui-shell` | `in_progress` | `cursor:android-ui-shell` | `2026-06-14` | `apps/android` Compose UI theme, auth, chat list, chat mock | `feature/track-d-android-ui-shell` | Phase 1: web-aligned design system + navigation shell |
-| `site-landing-distribution` | `in_progress` | `cursor:site-landing` | `2026-06-17` | `apps/site`, `infra/nginx`, deploy docs | `feature/site-landing-distribution` | landing RU/EN + downloads manifest + nginx template |
+| `site-landing-distribution` | `done` | `cursor:site-landing` | `2026-06-17` | `apps/site`, `infra/nginx`, deploy docs | `feature/site-landing-distribution` | merged to develop @ ff7fdd3 |
 
 ### Planned next (pick one track for new agents)
 
@@ -164,7 +164,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-26: AuthPage hover/active affordances (inputs, avatar, language, theme, submit) — `apps/web/src/index.css`; PR #6 → `develop`.
 - 2026-05-26: Track C — DM E2EE prekeys API + web Double Ratchet wire (`e2ee_strict` text DMs); migration `20260526120000_e2ee_prekeys`; PR #5 → `develop`.
 - 2026-05-26: Track C — web media E2EE for DM in `e2ee_strict` (encrypted blob upload + client decrypt); PR #7 → `develop`.
-- 2026-05-26: Untrack 87 `node_modules` paths committed by mistake (`apps/web`, services); PR #8 → `develop` @ `ab38a34`.
+- 2026-06-17: `apps/site` landing (RU/EN, theme, releases.json) + nginx templates for `/` + `/app/` on every instance; merged to `develop` @ `ff7fdd3`.
 
 ## 6) Handoff for new Cursor / cloud agents
 
