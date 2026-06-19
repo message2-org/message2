@@ -4,7 +4,6 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
   type RefObject
 } from "react";
 import EmojiPicker, { type EmojiClickData } from "emoji-picker-react";
@@ -12,6 +11,14 @@ import { buildAvatarGradient, buildUserInitials } from "../lib/avatar";
 import { copy, localeOptions, Locale } from "../i18n";
 import { chatMatchesSearch } from "../search-utils";
 import { SidebarDiscovery } from "../components/SidebarDiscovery";
+import { UserAvatar } from "../components/UserAvatar";
+import { ProfileInfoPanel } from "../components/ProfileInfoPanel";
+import { CreateGroupChatModal, type CreateChatKind } from "../components/CreateGroupChatModal";
+import { SettingsModal, type SettingsScreen } from "../components/SettingsModal";
+import { MessageActionDialog } from "../components/MessageActionDialog";
+import { MessageContextMenu } from "../components/MessageContextMenu";
+import { MessageBubbleTail } from "../components/MessageBubbleTail";
+import { APP_VERSION, appDisplayName } from "../lib/app-meta";
 import { AuthUser, ChatItem, Message, PendingAttachment, StickerItem, StickerPack, TransparencyBanner } from "../types";
 import { localizeStickerPacks } from "../lib/sticker-i18n";
 import { emojiPickerCategories, emojiPickerData, emojiPickerLabels } from "../lib/emoji-picker-locale";
@@ -19,30 +26,40 @@ import { EMOTION_GIF_PRESETS, EMOTION_VIDEO_PRESETS } from "../lib/emotion-media
 import {
   AppChatIcon,
   ArchiveIcon,
+  AtIcon,
   BellIcon,
   CalendarIcon,
+  CameraIcon,
   ChecklistIcon,
   CheckDoubleIcon,
   CheckSingleIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   DotsVerticalIcon,
   EmojiSmileIcon,
   FileIcon,
+  GiftIcon,
+  GridIcon,
   HamburgerIcon,
   ImageIcon,
   InfoIcon,
   LanguageIcon,
   LinkIcon,
   LogoutIcon,
+  MegaphoneIcon,
   MicIcon,
-  PaletteIcon,
   PaperclipIcon,
   PencilIcon,
+  PhoneIcon,
   PinIcon,
   PollIcon,
+  PlusCircleIcon,
   SearchIcon,
   SendPlaneIcon,
   SavedMessagesIcon,
   SettingsIcon,
+  SparkleIcon,
   StickerIcon,
   StarIcon,
   TrashIcon,
@@ -181,6 +198,7 @@ type ChatPageProps = {
   locale: Locale;
   theme: "light" | "dark";
   authUser: AuthUser;
+  accessToken: string | null;
   /** Resolved URL for `<img>` (blob, data, or https). */
   userAvatar: string | null;
   /** Stored profile value (`media:<id>`, legacy data URL, or null). */
@@ -208,6 +226,8 @@ type ChatPageProps = {
   onCloseMenu: () => void;
   onSelectChat: (id: string) => void;
   onOpenDirectChat: (user: { id: string; username: string; displayName: string }) => void | Promise<void>;
+  onCreateGroupChat: (title: string, members: { id: string; username: string; displayName: string }[]) => void | Promise<void>;
+  onSearchUsers: (query: string) => Promise<{ id: string; username: string; displayName: string }[]>;
   onSearchChange: (value: string) => void;
   replyTo: Message | null;
   onCancelReply: () => void;
@@ -218,7 +238,7 @@ type ChatPageProps = {
   onSendMessage: (attachment?: PendingAttachment) => void;
   onSendSticker: (sticker: StickerItem) => void;
   onEditMessage: (chatId: string, messageId: string, cipherText: string) => void | Promise<void>;
-  onDeleteMessage: (chatId: string, messageId: string) => void | Promise<void>;
+  onDeleteMessage: (chatId: string, messageId: string, scope: "self" | "everyone") => void | Promise<void>;
   onToggleReaction: (chatId: string, messageId: string, emoji: string) => void | Promise<void>;
   onLogout: () => void;
   onThemeToggle: () => void;
@@ -271,6 +291,7 @@ export function ChatPage(props: ChatPageProps) {
     locale,
     theme,
     authUser,
+    accessToken,
     userAvatar,
     userAvatarRef,
     isMenuOpen,
@@ -295,6 +316,8 @@ export function ChatPage(props: ChatPageProps) {
     onCloseMenu,
     onSelectChat,
     onOpenDirectChat,
+    onCreateGroupChat,
+    onSearchUsers,
     onSearchChange,
     replyTo,
     onCancelReply,
@@ -323,11 +346,16 @@ export function ChatPage(props: ChatPageProps) {
   } = props;
   const t = copy[locale];
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuToggleRef = useRef<HTMLButtonElement | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isProfilePanelOpen, setIsProfilePanelOpen] = useState(false);
-  const [activeSubmenu, setActiveSubmenu] = useState<null | "theme" | "locale">(null);
-  const [submenuTop, setSubmenuTop] = useState(8);
-  const [submenuLeft, setSubmenuLeft] = useState(210);
+  const [isProfileEditMode, setIsProfileEditMode] = useState(false);
+  const [profileModalToast, setProfileModalToast] = useState("");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsScreen, setSettingsScreen] = useState<SettingsScreen>("main");
+  const [settingsToast, setSettingsToast] = useState("");
+  const [frequentContactsEnabled, setFrequentContactsEnabled] = useState(true);
+  const [isLocaleMenuOpen, setIsLocaleMenuOpen] = useState(false);
   const [profileName, setProfileName] = useState(authUser.displayName);
   const [profileUsername, setProfileUsername] = useState(authUser.username);
   const [profileOldPassword, setProfileOldPassword] = useState("");
@@ -340,7 +368,8 @@ export function ChatPage(props: ChatPageProps) {
   const [isChatMenuOpen, setIsChatMenuOpen] = useState(false);
   const [isChatInfoOpen, setIsChatInfoOpen] = useState(false);
   const [topDrawer, setTopDrawer] = useState<"profile" | "chat">("profile");
-  const [isChatInfoEditMode, setIsChatInfoEditMode] = useState(false);
+  const [chatInfoMemberQuery, setChatInfoMemberQuery] = useState("");
+  const [chatInfoMediaOpen, setChatInfoMediaOpen] = useState(false);
   const [pinnedChats, setPinnedChats] = useState<Record<string, boolean>>({});
   const [mutedChats, setMutedChats] = useState<Record<string, boolean>>({});
   const [chatContextMenu, setChatContextMenu] = useState<{ chatId: string; x: number; y: number } | null>(null);
@@ -349,16 +378,8 @@ export function ChatPage(props: ChatPageProps) {
   const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null);
   const [isAttachmentUploading, setIsAttachmentUploading] = useState(false);
   const [attachmentUploadError, setAttachmentUploadError] = useState("");
-  const [chatDescriptions, setChatDescriptions] = useState<Record<string, string>>({});
-  const [chatDisplayAliases, setChatDisplayAliases] = useState<Record<string, string>>({});
-  const [chatInfoAvatars, setChatInfoAvatars] = useState<Record<string, string>>({});
-  const [chatInfoDraftName, setChatInfoDraftName] = useState("");
-  const [chatInfoDraftDescription, setChatInfoDraftDescription] = useState("");
-  const [chatInfoDraftAlias, setChatInfoDraftAlias] = useState("");
-  const [chatInfoDraftAvatar, setChatInfoDraftAvatar] = useState<string | null>(null);
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string | null>(null);
   const [mediaPreviewType, setMediaPreviewType] = useState<"image" | "video" | null>(null);
-  const [activeChatInfoSection, setActiveChatInfoSection] = useState<"media" | "files" | "groups">("media");
   const [isArchiveViewOpen, setIsArchiveViewOpen] = useState(false);
   const [isArchiveMenuOpen, setIsArchiveMenuOpen] = useState(false);
   const [isArchiveHiddenFromMain, setIsArchiveHiddenFromMain] = useState(false);
@@ -367,10 +388,15 @@ export function ChatPage(props: ChatPageProps) {
   const [archiveKeepUnreadCounter, setArchiveKeepUnreadCounter] = useState(true);
   const [archiveAutoArchiveMuted, setArchiveAutoArchiveMuted] = useState(false);
   const [isNewChatMenuOpen, setIsNewChatMenuOpen] = useState(false);
+  const [createChatModalKind, setCreateChatModalKind] = useState<CreateChatKind | null>(null);
   const [isDiscoveryOpen, setIsDiscoveryOpen] = useState(false);
   const [discoveryTab, setDiscoveryTab] = useState<DiscoveryTabId>("chats");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [messageContextMenu, setMessageContextMenu] = useState<{ messageId: string; x: number; y: number } | null>(null);
+  const [messageActionDialog, setMessageActionDialog] = useState<{ kind: "forward" | "delete"; messageId: string } | null>(null);
+  const [messageToast, setMessageToast] = useState("");
+  const [menuToast, setMenuToast] = useState("");
   const [isMessageSelectMode, setIsMessageSelectMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const [pickerTab, setPickerTab] = useState<"emoji" | "stickers" | "gifs" | "videos">("emoji");
@@ -398,6 +424,7 @@ export function ChatPage(props: ChatPageProps) {
   const chatMenuRef = useRef<HTMLDivElement | null>(null);
   const archiveMenuRef = useRef<HTMLDivElement | null>(null);
   const newChatMenuRef = useRef<HTMLDivElement | null>(null);
+  const headerSearchRef = useRef<HTMLInputElement | null>(null);
   const attachMenuRef = useRef<HTMLDivElement | null>(null);
   const emojiRef = useRef<HTMLDivElement | null>(null);
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -405,25 +432,59 @@ export function ChatPage(props: ChatPageProps) {
   useEffect(() => {
     if (!isMenuOpen) return;
     const onDocClick = (event: MouseEvent) => {
-      if (!menuRef.current) return;
-      if (!menuRef.current.contains(event.target as Node)) onCloseMenu();
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (menuToggleRef.current?.contains(target)) return;
+      onCloseMenu();
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseMenu();
     };
     document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEscape);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEscape);
+    };
   }, [isMenuOpen, onCloseMenu]);
   useEffect(() => {
     if (!isMenuOpen) {
-      setActiveSubmenu(null);
+      setIsLocaleMenuOpen(false);
+      setMenuToast("");
     }
   }, [isMenuOpen]);
   useEffect(() => {
-    if (!isProfilePanelOpen) return;
+    if (!isProfilePanelOpen) {
+      setIsProfileEditMode(false);
+      setProfileModalToast("");
+      return;
+    }
     const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsProfilePanelOpen(false);
+      if (event.key === "Escape") closeProfilePanel();
     };
     document.addEventListener("keydown", onEscape);
     return () => document.removeEventListener("keydown", onEscape);
   }, [isProfilePanelOpen]);
+  useEffect(() => {
+    if (!profileModalToast) return;
+    const timer = window.setTimeout(() => setProfileModalToast(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [profileModalToast]);
+  useEffect(() => {
+    if (!isSettingsOpen) {
+      setSettingsScreen("main");
+      setSettingsToast("");
+      return;
+    }
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (settingsScreen === "privacy") setSettingsScreen("main");
+        else closeSettingsPanel();
+      }
+    };
+    document.addEventListener("keydown", onEscape);
+    return () => document.removeEventListener("keydown", onEscape);
+  }, [isSettingsOpen, settingsScreen]);
   useEffect(() => {
     if (!isProfilePanelOpen) return;
     setProfileName(authUser.displayName);
@@ -541,15 +602,10 @@ export function ChatPage(props: ChatPageProps) {
     [chats, locale]
   );
   useEffect(() => {
-    const selectedChat = localizedChats.find((chat) => chat.id === activeChatId) ?? null;
-    if (!isChatInfoOpen || !selectedChat) return;
-    setIsChatInfoEditMode(false);
-    setActiveChatInfoSection("media");
-    setChatInfoDraftName(selectedChat.name);
-    setChatInfoDraftDescription(chatDescriptions[selectedChat.id] ?? "");
-    setChatInfoDraftAlias(chatDisplayAliases[selectedChat.id] ?? "");
-    setChatInfoDraftAvatar(chatInfoAvatars[selectedChat.id] ?? null);
-  }, [isChatInfoOpen, localizedChats, activeChatId, chatDescriptions, chatDisplayAliases, chatInfoAvatars]);
+    if (!isChatInfoOpen) return;
+    setChatInfoMemberQuery("");
+    setChatInfoMediaOpen(false);
+  }, [isChatInfoOpen, activeChatId]);
   const effectiveChats = useMemo(
     () =>
       localizedChats.map((chat) => ({
@@ -648,14 +704,31 @@ export function ChatPage(props: ChatPageProps) {
   const chatListItems = isArchiveViewOpen ? archivedChats : mainChats;
   const activeChat = localizedChats.find((chat) => chat.id === activeChatId) ?? null;
   const activeChatMessages = activeChat ? messages : [];
+  const contextMenuMessage = messageContextMenu
+    ? activeChatMessages.find((row) => row.id === messageContextMenu.messageId) ?? null
+    : null;
+  const actionDialogMessage = messageActionDialog
+    ? activeChatMessages.find((row) => row.id === messageActionDialog.messageId) ?? null
+    : null;
   const chatMediaItems = activeChatMessages.filter((message) => message.preview && (message.previewType === "image" || message.previewType === "video"));
-  const chatFileItems = activeChatMessages.filter((message) => message.preview && (message.previewType === "file" || message.previewType === "audio"));
-  const activeChatDescription = activeChat ? chatDescriptions[activeChat.id] ?? "" : "";
-  const activeChatAlias = activeChat ? chatDisplayAliases[activeChat.id] ?? "" : "";
-  const activeChatInfoAvatar = activeChat ? chatInfoAvatars[activeChat.id] ?? null : null;
-  const canEditChatMeta = activeChat ? activeChat.kind === "group" && activeChat.group !== "archived" : false;
-  const canEditAlias = Boolean(activeChat && activeChat.kind === "dm");
-  const canDeleteContact = Boolean(activeChat && activeChat.kind === "dm");
+  const chatPhotoCount = activeChatMessages.filter((message) => message.preview && message.previewType === "image").length;
+  const chatVideoCount = activeChatMessages.filter((message) => message.preview && message.previewType === "video").length;
+  const chatFileCount = activeChatMessages.filter((message) => message.preview && message.previewType === "file").length;
+  const chatAudioCount = activeChatMessages.filter((message) => message.preview && message.previewType === "audio").length;
+  const chatInfoMembers = useMemo(() => {
+    if (!activeChat?.members?.length) return [];
+    const needle = chatInfoMemberQuery.trim().toLowerCase().replace(/^@+/, "");
+    const sorted = [...activeChat.members].sort((left, right) =>
+      (left.displayName || left.username).localeCompare(right.displayName || right.username, locale === "ru" ? "ru" : "en")
+    );
+    if (!needle) return sorted;
+    return sorted.filter(
+      (member) =>
+        member.username.toLowerCase().includes(needle) ||
+        member.displayName.toLowerCase().includes(needle)
+    );
+  }, [activeChat?.members, chatInfoMemberQuery, locale]);
+  const activeChatIsMuted = activeChat ? Boolean(mutedChats[activeChat.id]) : false;
 
   function formatChatTime(value: string | undefined) {
     if (!value) return "";
@@ -719,8 +792,118 @@ export function ChatPage(props: ChatPageProps) {
     if (locale === "ru") return `${target.getDate()} ${monthsRu[target.getMonth()]}${target.getFullYear() === now.getFullYear() ? "" : ` ${target.getFullYear()} г.`}`;
     return `${monthsEn[target.getMonth()]} ${target.getDate()}${target.getFullYear() === now.getFullYear() ? "" : `, ${target.getFullYear()}`}`;
   }
-  function senderInitial(author: string) {
-    return author.trim().slice(0, 1).toUpperCase() || "?";
+  function avatarUrlForMessageSender(message: Message) {
+    if (message.senderAvatarUrl) return message.senderAvatarUrl;
+    if (activeChat?.kind === "dm") return activeChat.peerAvatarUrl ?? null;
+    if (!message.senderUserId || !activeChat?.members?.length) return null;
+    return activeChat.members.find((member) => member.id === message.senderUserId)?.avatarUrl ?? null;
+  }
+  function memberPreviewForReactionUser(userId: string) {
+    if (userId === authUser.id) {
+      return { id: authUser.id, displayName: authUser.displayName, avatarUrl: userAvatarRef };
+    }
+    if (activeChat?.kind === "dm" && activeChat.peerUserId === userId) {
+      return { id: userId, displayName: activeChat.name, avatarUrl: activeChat.peerAvatarUrl ?? null };
+    }
+    const member = activeChat?.members?.find((row) => row.id === userId);
+    if (member) {
+      return { id: member.id, displayName: member.displayName, avatarUrl: member.avatarUrl ?? null };
+    }
+    return { id: userId, displayName: userId.slice(0, 8), avatarUrl: null };
+  }
+  function renderReactionChips(message: Message, canReact: boolean) {
+    if (!message.reactions?.length) return null;
+    return (
+      <div className="message__reaction-chips">
+        {message.reactions.map((reaction) => {
+          const reactorIds = reaction.userIds ?? [];
+          const labels = reactorIds.map((userId) => {
+            const member = memberPreviewForReactionUser(userId);
+            return `${member.displayName} · ${reaction.emoji}`;
+          });
+          const chipLabel =
+            labels.length > 0
+              ? labels.join(", ")
+              : `${reaction.emoji} ${reaction.count}`;
+          return (
+            <button
+              key={reaction.emoji}
+              type="button"
+              className={`message__reaction-chip ${reaction.reactedByMe ? "message__reaction-chip--mine" : ""}`}
+              disabled={!canReact}
+              title={chipLabel}
+              aria-label={chipLabel}
+              onClick={() => canReact && activeChatId && void onToggleReaction(activeChatId, message.id, reaction.emoji)}
+            >
+              <span className="message__reaction-chip-emoji" aria-hidden>
+                {reaction.emoji}
+              </span>
+              {reactorIds.length > 0 ? (
+                <span className="message__reaction-chip-faces" aria-hidden>
+                  {reactorIds.map((userId, index) => {
+                    const member = memberPreviewForReactionUser(userId);
+                    return (
+                      <span
+                        key={userId}
+                        className={`message__reaction-chip-face ${userId === authUser.id ? "message__reaction-chip-face--mine" : ""}`}
+                        style={{ zIndex: index + 1 }}
+                        title={`${member.displayName} · ${reaction.emoji}`}
+                      >
+                        <UserAvatar
+                          userId={member.id}
+                          name={member.displayName}
+                          avatarUrl={member.avatarUrl}
+                          accessToken={accessToken}
+                          className="message__reaction-chip-avatar"
+                        />
+                      </span>
+                    );
+                  })}
+                </span>
+              ) : (
+                <span className="message__reaction-chip-count">{reaction.count}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+  function renderMessageSenderAvatar(message: Message) {
+    if (activeChat && isAppSystemChat(activeChat)) {
+      return (
+        <span className="message-row__avatar chat-avatar chat-avatar--app chat-avatar--message">
+          <AppChatIcon />
+        </span>
+      );
+    }
+    if (activeChat && isSavedSystemChat(activeChat)) {
+      return (
+        <span className="message-row__avatar chat-avatar chat-avatar--saved chat-avatar--message">
+          <SavedMessagesIcon />
+        </span>
+      );
+    }
+    return (
+      <UserAvatar
+        userId={message.senderUserId ?? message.author}
+        name={message.author}
+        avatarUrl={avatarUrlForMessageSender(message)}
+        accessToken={accessToken}
+        className="message-row__avatar"
+      />
+    );
+  }
+  function renderMyMessageAvatar() {
+    return (
+      <UserAvatar
+        userId={authUser.id}
+        name={authUser.displayName || authUser.username}
+        avatarUrl={userAvatarRef ?? authUser.avatarUrl}
+        accessToken={accessToken}
+        className="message-row__avatar"
+      />
+    );
   }
   function isEmojiOnlyText(value: string) {
     const trimmed = value.trim();
@@ -822,6 +1005,44 @@ export function ChatPage(props: ChatPageProps) {
     setIsMessageSelectMode(false);
     setSelectedMessageIds([]);
   }
+  function openMessageContextMenu(messageId: string, x: number, y: number) {
+    setMessageContextMenu({ messageId, x, y });
+  }
+  function copyMessageText(message: Message) {
+    const value = message.sticker?.label ?? message.fileName ?? message.text ?? "";
+    if (!value.trim()) return;
+    void navigator.clipboard.writeText(value).then(() => {
+      setMessageToast(locale === "ru" ? "Скопировано" : "Copied");
+    });
+  }
+  function startMessageSelect(message: Message) {
+    setIsMessageSelectMode(true);
+    setSelectedMessageIds([message.id]);
+  }
+  function startMessageEdit(message: Message) {
+    setEditingMessageId(message.id);
+    onInputChange(message.text);
+    requestAnimationFrame(resizeComposerInput);
+  }
+  useEffect(() => {
+    if (!messageToast) return;
+    const timer = window.setTimeout(() => setMessageToast(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [messageToast]);
+  useEffect(() => {
+    if (!settingsToast) return;
+    const timer = window.setTimeout(() => setSettingsToast(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [settingsToast]);
+  useEffect(() => {
+    if (!menuToast) return;
+    const timer = window.setTimeout(() => setMenuToast(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [menuToast]);
+  useEffect(() => {
+    setMessageContextMenu(null);
+    setMessageActionDialog(null);
+  }, [activeChatId]);
   async function submitNewStickerPack() {
     const title = newPackTitle.trim();
     if (!title) return;
@@ -1073,12 +1294,78 @@ export function ChatPage(props: ChatPageProps) {
     setProfileConfirmPassword("");
     setActiveProfileEdit(null);
   }
-  function openFlyout(kind: "theme" | "locale", event: ReactMouseEvent<HTMLButtonElement>) {
-    const rowTop = event.currentTarget.offsetTop;
-    const menuWidth = event.currentTarget.parentElement?.clientWidth ?? 224;
-    setSubmenuTop(Math.max(6, rowTop));
-    setSubmenuLeft(Math.max(170, menuWidth - 14));
-    setActiveSubmenu(kind);
+  function closeProfilePanel() {
+    setIsProfilePanelOpen(false);
+    setIsProfileEditMode(false);
+    cancelProfileEdit();
+  }
+  function openSettingsFromMenu() {
+    setSettingsScreen("main");
+    setIsSettingsOpen(true);
+    onCloseMenu();
+  }
+  function closeSettingsPanel() {
+    setIsSettingsOpen(false);
+    setSettingsScreen("main");
+    setSettingsToast("");
+  }
+  function openProfileFromSettings() {
+    closeSettingsPanel();
+    openProfileFromMenu();
+  }
+  function showSettingsStub(label: string) {
+    setSettingsToast(locale === "ru" ? `«${label}» пока недоступно` : `${label} is not available yet`);
+  }
+  function openProfileFromMenu() {
+    setIsProfileEditMode(false);
+    setIsProfilePanelOpen(true);
+    onCloseMenu();
+  }
+  async function copyProfileUsername() {
+    try {
+      await navigator.clipboard.writeText(`@${authUser.username}`);
+      setProfileModalToast(locale === "ru" ? "Имя пользователя скопировано" : "Username copied");
+    } catch {
+      setProfileModalToast(locale === "ru" ? "Не удалось скопировать" : "Could not copy");
+    }
+  }
+  function showProfileStub(label: string) {
+    setProfileModalToast(locale === "ru" ? `«${label}» пока недоступно` : `${label} is not available yet`);
+  }
+  function exitProfileInfo() {
+    cancelProfileEdit();
+    setIsProfileEditMode(false);
+  }
+  function profileInfoBack() {
+    if (activeProfileEdit) {
+      cancelProfileEdit();
+      return;
+    }
+    exitProfileInfo();
+  }
+  const profileEditorTitle =
+    activeProfileEdit === "name"
+      ? locale === "ru"
+        ? "Имя"
+        : "Name"
+      : activeProfileEdit === "username"
+        ? locale === "ru"
+          ? "Имя пользователя"
+          : "Username"
+        : locale === "ru"
+          ? "Пароль"
+          : "Password";
+  function openSavedMessagesChat() {
+    const savedChat = chats.find((chat) => isSavedSystemChat(chat));
+    if (savedChat) {
+      onSelectChat(savedChat.id);
+      onCloseMenu();
+      return;
+    }
+    showMenuStub(locale === "ru" ? "Сохранённые сообщения" : "Saved Messages");
+  }
+  function showMenuStub(label: string) {
+    setMenuToast(locale === "ru" ? `«${label}» пока недоступно` : `${label} is not available yet`);
   }
   function userInitials() {
     return buildUserInitials(authUser.displayName, authUser.username);
@@ -1098,47 +1385,23 @@ export function ChatPage(props: ChatPageProps) {
       return locale === "ru" ? `${name} печатает…` : `${name} is typing…`;
     }
     if (!chat) return "";
-    if (chat.kind === "group") return locale === "ru" ? "7 участников" : "7 participants";
+    if (chat.kind === "group") return groupMembersLabel(chat);
     return chat.status === "online" ? t.online : t.lastSeen;
   }
-  function chatPublicHandle(chat: ChatItem | null) {
-    if (!chat) return "";
-    const normalized = chat.name
-      .toLowerCase()
-      .replace(/[^a-z0-9а-яё]+/gi, "")
-      .slice(0, 22);
-    return normalized || chat.id;
-  }
-  function chatInternalUrl(chat: ChatItem | null) {
-    if (!chat) return "";
-    return `message2.local/${chatPublicHandle(chat)}`;
-  }
   function groupMembersCount(chat: ChatItem | null) {
-    if (!chat) return 0;
-    return chat.kind === "group" ? 7 : 1;
-  }
-  function groupAdminsCount(chat: ChatItem | null) {
     if (!chat || chat.kind !== "group") return 0;
-    return 2;
+    return chat.members?.length ?? 0;
   }
-  function groupRemovedCount(chat: ChatItem | null) {
-    if (!chat || chat.kind !== "group") return 0;
-    return 1;
-  }
-  function saveChatInfoChanges() {
-    if (!activeChat) return;
-    if (canEditChatMeta) {
-      const nextName = chatInfoDraftName.trim() || activeChat.name;
-      onUpdateChat(activeChat.id, { name: nextName });
-      setChatDescriptions((prev) => ({ ...prev, [activeChat.id]: chatInfoDraftDescription.trim() }));
+  function groupMembersLabel(chat: ChatItem | null) {
+    const count = groupMembersCount(chat);
+    if (locale === "ru") {
+      const mod10 = count % 10;
+      const mod100 = count % 100;
+      if (mod10 === 1 && mod100 !== 11) return `${count} участник`;
+      if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} участника`;
+      return `${count} участников`;
     }
-    if (canEditAlias) {
-      setChatDisplayAliases((prev) => ({ ...prev, [activeChat.id]: chatInfoDraftAlias.trim() }));
-    }
-    if (chatInfoDraftAvatar) {
-      setChatInfoAvatars((prev) => ({ ...prev, [activeChat.id]: chatInfoDraftAvatar }));
-    }
-    setIsChatInfoEditMode(false);
+    return count === 1 ? "1 member" : `${count} members`;
   }
   function openChatInfoFromHeader() {
     setTopDrawer("chat");
@@ -1149,6 +1412,22 @@ export function ChatPage(props: ChatPageProps) {
     nextUrl.hash = `chat-${chatId}`;
     window.open(nextUrl.toString(), "_blank", "noopener,noreferrer");
     setChatContextMenu(null);
+  }
+  function openNewChatDiscovery(tab: DiscoveryTabId) {
+    setIsNewChatMenuOpen(false);
+    setIsDiscoveryOpen(true);
+    setIsArchiveViewOpen(false);
+    setDiscoveryTab(tab);
+    onCloseMenu();
+    requestAnimationFrame(() => headerSearchRef.current?.focus());
+  }
+  function openCreateMultiMemberChat(kind: CreateChatKind) {
+    setIsNewChatMenuOpen(false);
+    setCreateChatModalKind(kind);
+  }
+  async function submitCreateMultiMemberChat(title: string, members: { id: string; username: string; displayName: string }[]) {
+    await onCreateGroupChat(title, members);
+    setIsDiscoveryOpen(false);
   }
   function toggleChatRead(chat: ChatItem) {
     onUpdateChat(chat.id, { unread: chat.unread > 0 ? 0 : 1 });
@@ -1248,6 +1527,17 @@ export function ChatPage(props: ChatPageProps) {
         </span>
       );
     }
+    if (chat.kind === "dm" && chat.peerUserId) {
+      return (
+        <UserAvatar
+          userId={chat.peerUserId}
+          name={chat.name}
+          avatarUrl={chat.peerAvatarUrl}
+          accessToken={accessToken}
+          className={avatarClass}
+        />
+      );
+    }
     return (
       <span className={avatarClass} style={{ backgroundImage: chatGradient(chat.id) }}>
         {getChatInitials(chat.name)}
@@ -1262,20 +1552,9 @@ export function ChatPage(props: ChatPageProps) {
     const light = 58;
     return `linear-gradient(145deg, hsl(${hue} ${sat}% ${light}%), hsl(${hue} ${sat}% ${Math.max(30, light - 16)}%))`;
   }
-  const isDrawerOpen = isProfilePanelOpen || isChatInfoOpen;
+  const isDrawerOpen = isChatInfoOpen;
+  const activeDrawer = isChatInfoOpen ? "chat" : null;
   const showDiscoveryHeader = isDiscoveryOpen && !isArchiveViewOpen;
-  const activeDrawer =
-    topDrawer === "chat"
-      ? isChatInfoOpen
-        ? "chat"
-        : isProfilePanelOpen
-          ? "profile"
-          : null
-      : isProfilePanelOpen
-        ? "profile"
-        : isChatInfoOpen
-          ? "chat"
-          : null;
 
   return (
     <main
@@ -1285,7 +1564,7 @@ export function ChatPage(props: ChatPageProps) {
         ["--drawer-width" as string]: "340px"
       }}
     >
-      <aside className="sidebar">
+      <aside className={`sidebar ${isMenuOpen ? "sidebar--menu-open" : ""}`}>
         {isArchiveViewOpen ? (
           <header className="sidebar__header sidebar__header--archive">
             <div className="sidebar__archive-title-wrap">
@@ -1368,99 +1647,15 @@ export function ChatPage(props: ChatPageProps) {
               </button>
             ) : (
               <>
-                <button className={`icon-button icon-button--ghost ${isMenuOpen ? "icon-button--active" : ""}`} onClick={onToggleMenu} aria-label={locale === "ru" ? "Открыть меню" : "Open menu"}>
+                <button
+                  ref={menuToggleRef}
+                  className={`icon-button icon-button--ghost ${isMenuOpen ? "icon-button--active" : ""}`}
+                  onClick={onToggleMenu}
+                  aria-label={locale === "ru" ? "Открыть меню" : "Open menu"}
+                  aria-expanded={isMenuOpen}
+                >
                   <HamburgerIcon />
                 </button>
-                {isMenuOpen ? (
-                  <div className="burger-popover" ref={menuRef} onMouseLeave={() => setActiveSubmenu(null)}>
-                    <div className="burger-menu">
-                      <button
-                        className="burger-menu__item"
-                        type="button"
-                        onMouseEnter={() => setActiveSubmenu(null)}
-                        onClick={() => {
-                          setTopDrawer("profile");
-                          setIsProfilePanelOpen(true);
-                          onCloseMenu();
-                        }}
-                      >
-                        <UserIcon />
-                        <span>{locale === "ru" ? "Мой аккаунт" : "My account"}</span>
-                      </button>
-                      <button className="burger-menu__item" type="button" onMouseEnter={(event) => openFlyout("theme", event)} onClick={(event) => openFlyout("theme", event)}>
-                        <PaletteIcon />
-                        <span>{locale === "ru" ? "Тема" : "Theme"}</span>
-                      </button>
-                      <button className="burger-menu__item" type="button" onMouseEnter={(event) => openFlyout("locale", event)} onClick={(event) => openFlyout("locale", event)}>
-                        <LanguageIcon />
-                        <span>{locale === "ru" ? "Язык" : "Language"}</span>
-                      </button>
-                      <button className="burger-menu__item" type="button" onMouseEnter={() => setActiveSubmenu(null)}>
-                        <InfoIcon />
-                        <span>{t.aboutUs}</span>
-                      </button>
-                      <button className="burger-menu__item burger-menu__item--danger" type="button" onMouseEnter={() => setActiveSubmenu(null)} onClick={requestLogout}>
-                        <LogoutIcon />
-                        <span>{t.logout}</span>
-                      </button>
-                    </div>
-                    {activeSubmenu ? (
-                      <div className="burger-submenu-flyout" style={{ top: `${submenuTop}px`, left: `${submenuLeft}px` }}>
-                        {activeSubmenu === "theme" ? (
-                          <>
-                            <button
-                              className={`burger-submenu__item ${theme === "dark" ? "burger-submenu__item--active" : ""}`}
-                              type="button"
-                              onClick={() => {
-                                if (theme !== "dark") onThemeToggle();
-                                setActiveSubmenu(null);
-                              }}
-                            >
-                              <img src="/icons/moon.svg" alt="" className="burger-submenu__icon" />
-                              {locale === "ru" ? "Темная" : "Dark"}
-                            </button>
-                            <button
-                              className={`burger-submenu__item ${theme === "light" ? "burger-submenu__item--active" : ""}`}
-                              type="button"
-                              onClick={() => {
-                                if (theme !== "light") onThemeToggle();
-                                setActiveSubmenu(null);
-                              }}
-                            >
-                              <img src="/icons/sun.svg" alt="" className="burger-submenu__icon" />
-                              {locale === "ru" ? "Светлая" : "Light"}
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              className={`burger-submenu__item ${locale === "ru" ? "burger-submenu__item--active" : ""}`}
-                              type="button"
-                              onClick={() => {
-                                onLocaleSelect("ru");
-                                setActiveSubmenu(null);
-                              }}
-                            >
-                              <img src={localeOptions.ru.flag} alt="" className="burger-submenu__flag" />
-                              Русский
-                            </button>
-                            <button
-                              className={`burger-submenu__item ${locale === "en" ? "burger-submenu__item--active" : ""}`}
-                              type="button"
-                              onClick={() => {
-                                onLocaleSelect("en");
-                                setActiveSubmenu(null);
-                              }}
-                            >
-                              <img src={localeOptions.en.flag} alt="" className="burger-submenu__flag" />
-                              English
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
               </>
             )}
             <div
@@ -1478,7 +1673,13 @@ export function ChatPage(props: ChatPageProps) {
               {!isRealtimeReconnecting ? (
                 <>
                   <SearchIcon />
-                  <input className="search" value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder={t.searchChats} />
+                  <input
+                    ref={headerSearchRef}
+                    className="search"
+                    value={search}
+                    onChange={(event) => onSearchChange(event.target.value)}
+                    placeholder={t.searchChats}
+                  />
                 </>
               ) : (
                 <>
@@ -1491,10 +1692,23 @@ export function ChatPage(props: ChatPageProps) {
                 </>
               )}
             </div>
-            <div className={`realtime-badge ${isRealtimeConnected ? "realtime-badge--ok" : "realtime-badge--polling"}`} title={isRealtimeConnected ? "Realtime: WebSocket connected" : "Realtime: fallback polling"}>
-              <span className="realtime-badge__dot" aria-hidden />
-              <span>{isRealtimeConnected ? (locale === "ru" ? "Онлайн" : "Live") : (locale === "ru" ? "Опрос" : "Polling")}</span>
-            </div>
+            {!isRealtimeConnected ? (
+              <div
+                className={`realtime-badge ${isRealtimeReconnecting ? "realtime-badge--polling" : "realtime-badge--polling"}`}
+                title={
+                  isRealtimeReconnecting
+                    ? locale === "ru"
+                      ? "Realtime: переподключение WebSocket"
+                      : "Realtime: reconnecting WebSocket"
+                    : locale === "ru"
+                      ? "Realtime: опрос сервера (WebSocket недоступен)"
+                      : "Realtime: polling (WebSocket unavailable)"
+                }
+              >
+                <span className="realtime-badge__dot" aria-hidden />
+                <span>{isRealtimeReconnecting ? (locale === "ru" ? "Связь…" : "Connecting…") : locale === "ru" ? "Опрос" : "Polling"}</span>
+              </div>
+            ) : null}
           </header>
         )}
 
@@ -1604,19 +1818,21 @@ export function ChatPage(props: ChatPageProps) {
                   </svg>
                 </button>
                 {isNewChatMenuOpen ? (
-                  <div className="chat-panel__menu chat-list__new-chat-menu">
-                    <button type="button" onClick={() => setIsNewChatMenuOpen(false)}>
-                      <LinkIcon />
-                      <span>{locale === "ru" ? "Новый канал" : "New channel"}</span>
-                    </button>
-                    <button type="button" onClick={() => setIsNewChatMenuOpen(false)}>
-                      <UsersIcon />
-                      <span>{locale === "ru" ? "Новая группа" : "New group"}</span>
-                    </button>
-                    <button type="button" onClick={() => setIsNewChatMenuOpen(false)}>
-                      <UserIcon />
-                      <span>{locale === "ru" ? "Новый приватный чат" : "New private chat"}</span>
-                    </button>
+                  <div className="chat-list__new-chat-popover">
+                    <div className="burger-menu" role="menu">
+                      <button className="burger-menu__item" type="button" role="menuitem" onClick={() => openCreateMultiMemberChat("channel")}>
+                        <MegaphoneIcon />
+                        <span>{locale === "ru" ? "Новый канал" : "New Channel"}</span>
+                      </button>
+                      <button className="burger-menu__item" type="button" role="menuitem" onClick={() => openCreateMultiMemberChat("group")}>
+                        <UsersIcon />
+                        <span>{locale === "ru" ? "Новая группа" : "New Group"}</span>
+                      </button>
+                      <button className="burger-menu__item" type="button" role="menuitem" onClick={() => openNewChatDiscovery("chats")}>
+                        <UserIcon />
+                        <span>{locale === "ru" ? "Новый приватный чат" : "New Private Chat"}</span>
+                      </button>
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -1664,6 +1880,149 @@ export function ChatPage(props: ChatPageProps) {
             })()}
           </div>
         ) : null}
+        <div className={`sidebar-drawer ${isMenuOpen ? "sidebar-drawer--open" : ""}`} ref={menuRef} aria-hidden={!isMenuOpen}>
+          <div className="sidebar-drawer__profile">
+            <button type="button" className="sidebar-drawer__profile-main" onClick={openProfileFromMenu}>
+              <UserAvatar
+                userId={authUser.id}
+                name={authUser.displayName || authUser.username}
+                avatarUrl={userAvatarRef ?? authUser.avatarUrl}
+                accessToken={accessToken}
+                className="sidebar-drawer__avatar"
+              />
+              <span className="sidebar-drawer__identity">
+                <span className="sidebar-drawer__name">{authUser.displayName || authUser.username}</span>
+                <span className="sidebar-drawer__status" role="presentation">
+                  {locale === "ru" ? "Установить emoji-статус" : "Set Emoji Status"}
+                </span>
+              </span>
+              <span className="sidebar-drawer__chevron" aria-hidden="true">
+                <ChevronDownIcon />
+              </span>
+            </button>
+            <button
+              type="button"
+              className="sidebar-drawer__status-hit"
+              onClick={() => showMenuStub(locale === "ru" ? "Emoji-статус" : "Emoji Status")}
+              aria-label={locale === "ru" ? "Установить emoji-статус" : "Set Emoji Status"}
+            />
+          </div>
+          <nav className="sidebar-drawer__nav" aria-label={locale === "ru" ? "Меню" : "Menu"}>
+            <button type="button" className="sidebar-drawer__item" onClick={openProfileFromMenu}>
+              <UserIcon />
+              <span>{locale === "ru" ? "Мой профиль" : "My Profile"}</span>
+            </button>
+            <button type="button" className="sidebar-drawer__item" onClick={() => showMenuStub(locale === "ru" ? "Кошелёк" : "Wallet")}>
+              <WalletIcon />
+              <span>{locale === "ru" ? "Кошелёк" : "Wallet"}</span>
+            </button>
+            <div className="sidebar-drawer__divider" role="separator" />
+            <button
+              type="button"
+              className="sidebar-drawer__item"
+              onClick={() => {
+                onCloseMenu();
+                openCreateMultiMemberChat("group");
+              }}
+            >
+              <UsersIcon />
+              <span>{locale === "ru" ? "Новая группа" : "New Group"}</span>
+            </button>
+            <button
+              type="button"
+              className="sidebar-drawer__item"
+              onClick={() => {
+                onCloseMenu();
+                openCreateMultiMemberChat("channel");
+              }}
+            >
+              <MegaphoneIcon />
+              <span>{locale === "ru" ? "Новый канал" : "New Channel"}</span>
+            </button>
+            <button type="button" className="sidebar-drawer__item" onClick={() => openNewChatDiscovery("chats")}>
+              <UserIcon />
+              <span>{locale === "ru" ? "Контакты" : "Contacts"}</span>
+            </button>
+            <button type="button" className="sidebar-drawer__item" onClick={() => showMenuStub(locale === "ru" ? "Звонки" : "Calls")}>
+              <PhoneIcon />
+              <span>{locale === "ru" ? "Звонки" : "Calls"}</span>
+            </button>
+            <button type="button" className="sidebar-drawer__item" onClick={openSavedMessagesChat}>
+              <SavedMessagesIcon />
+              <span>{locale === "ru" ? "Сохранённые сообщения" : "Saved Messages"}</span>
+            </button>
+            <button type="button" className="sidebar-drawer__item" onClick={openSettingsFromMenu}>
+              <SettingsIcon />
+              <span>{locale === "ru" ? "Настройки" : "Settings"}</span>
+            </button>
+            <button type="button" className="sidebar-drawer__item sidebar-drawer__item--toggle" onClick={onThemeToggle}>
+              <img src="/icons/moon.svg" alt="" className="sidebar-drawer__item-icon" />
+              <span>{locale === "ru" ? "Ночной режим" : "Night Mode"}</span>
+              <span className={`sidebar-drawer__switch ${theme === "dark" ? "sidebar-drawer__switch--on" : ""}`} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="sidebar-drawer__item"
+              onClick={() => setIsLocaleMenuOpen((prev) => !prev)}
+              aria-expanded={isLocaleMenuOpen}
+            >
+              <LanguageIcon />
+              <span>{locale === "ru" ? "Язык" : "Language"}</span>
+              <span className="sidebar-drawer__chevron sidebar-drawer__chevron--row" aria-hidden="true">
+                <ChevronDownIcon />
+              </span>
+            </button>
+            {isLocaleMenuOpen ? (
+              <div className="sidebar-drawer__submenu">
+                <button
+                  type="button"
+                  className={`sidebar-drawer__submenu-item ${locale === "ru" ? "sidebar-drawer__submenu-item--active" : ""}`}
+                  onClick={() => {
+                    onLocaleSelect("ru");
+                    setIsLocaleMenuOpen(false);
+                  }}
+                >
+                  <img src={localeOptions.ru.flag} alt="" className="burger-submenu__flag" />
+                  Русский
+                </button>
+                <button
+                  type="button"
+                  className={`sidebar-drawer__submenu-item ${locale === "en" ? "sidebar-drawer__submenu-item--active" : ""}`}
+                  onClick={() => {
+                    onLocaleSelect("en");
+                    setIsLocaleMenuOpen(false);
+                  }}
+                >
+                  <img src={localeOptions.en.flag} alt="" className="burger-submenu__flag" />
+                  English
+                </button>
+              </div>
+            ) : null}
+            <button type="button" className="sidebar-drawer__item" onClick={() => showMenuStub(t.aboutUs)}>
+              <InfoIcon />
+              <span>{t.aboutUs}</span>
+            </button>
+            <button type="button" className="sidebar-drawer__item sidebar-drawer__item--danger" onClick={requestLogout}>
+              <LogoutIcon />
+              <span>{t.logout}</span>
+            </button>
+          </nav>
+          <footer className="sidebar-drawer__footer">
+            <div className="sidebar-drawer__app-name">{appDisplayName(locale)}</div>
+            <p className="sidebar-drawer__app-version">
+              {locale === "ru" ? "Версия" : "Version"} {APP_VERSION}
+              {" – "}
+              <button type="button" className="sidebar-drawer__about-link" onClick={() => showMenuStub(t.aboutUs)}>
+                {t.aboutUs}
+              </button>
+            </p>
+          </footer>
+          {menuToast ? (
+            <div className="sidebar-drawer__toast" role="status">
+              {menuToast}
+            </div>
+          ) : null}
+        </div>
       </aside>
       <div id="chat-pane-divider" className="pane-divider" />
 
@@ -1852,65 +2211,34 @@ export function ChatPage(props: ChatPageProps) {
                   )
                 ) : null;
                 const canInteract = !message.isTombstone && !message.isDeleted && activeChatId;
-                const isMessageActive = hoveredMessageId === message.id || selectedMessageIds.includes(message.id);
-                const reactionRow = message.reactions?.length ? (
-                  <div className="message__reactions">
-                    {message.reactions.map((reaction) => (
-                      <button
-                        key={reaction.emoji}
-                        type="button"
-                        className={`message__reaction ${reaction.reactedByMe ? "message__reaction--mine" : ""}`}
-                        onClick={() => canInteract && void onToggleReaction(activeChatId!, message.id, reaction.emoji)}
-                      >
-                        {reaction.emoji} {reaction.count}
-                      </button>
-                    ))}
+                const canReact = canInteract && message.sender !== "me";
+                const isContextOpen = messageContextMenu?.messageId === message.id;
+                const isMessageActive =
+                  hoveredMessageId === message.id || selectedMessageIds.includes(message.id) || isContextOpen;
+                const reactionChips = renderReactionChips(message, canReact);
+                const messageFooter = (
+                  <div className="message__footer">
+                    <div className={`message__footer-main ${reactionChips ? "message__footer-main--with-reactions" : ""}`}>
+                      {reactionChips}
+                      <p className="message__time">{message.time}</p>
+                    </div>
                   </div>
-                ) : null;
+                );
                 const replyPreview = message.replyTo ? (
                   <div className="message__reply">
                     <span className="message__reply-author">{message.replyTo.author}</span>
                     <span className="message__reply-text">{message.replyTo.text}</span>
                   </div>
                 ) : null;
-                const actionBar = canInteract ? (
-                  <div className="message__actions" role="toolbar" aria-label={locale === "ru" ? "Действия" : "Actions"}>
-                    <button type="button" className="message__action-btn" onClick={() => onSetReplyTo(message)}>
-                      {locale === "ru" ? "Ответ" : "Reply"}
-                    </button>
-                    <button type="button" className="message__action-btn" onClick={() => void onToggleReaction(activeChatId!, message.id, "❤️")}>
-                      ❤️
-                    </button>
-                    {message.sender === "me" ? (
-                      <>
-                        <button
-                          type="button"
-                          className="message__action-btn"
-                          onClick={() => {
-                            setEditingMessageId(message.id);
-                            onInputChange(message.text);
-                            requestAnimationFrame(resizeComposerInput);
-                          }}
-                        >
-                          {locale === "ru" ? "Изм." : "Edit"}
-                        </button>
-                        <button
-                          type="button"
-                          className="message__action-btn message__action-btn--danger"
-                          onClick={() => void onDeleteMessage(activeChatId!, message.id)}
-                        >
-                          {locale === "ru" ? "Удалить" : "Delete"}
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                ) : null;
-                const quickReactionSlot = canInteract ? (
+                const quickReactionSlot = canReact ? (
                   <div className="message__quick-reaction-slot">
                     <button
                       type="button"
                       className="message__quick-heart"
-                      onClick={() => void onToggleReaction(activeChatId!, message.id, "❤️")}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void onToggleReaction(activeChatId!, message.id, "❤️");
+                      }}
                       aria-label={locale === "ru" ? "Поставить сердце" : "React with heart"}
                     >
                       ❤️
@@ -1921,7 +2249,10 @@ export function ChatPage(props: ChatPageProps) {
                           key={emoji}
                           type="button"
                           className="message__quick-reaction-btn"
-                          onClick={() => void onToggleReaction(activeChatId!, message.id, emoji)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void onToggleReaction(activeChatId!, message.id, emoji);
+                          }}
                         >
                           {emoji}
                         </button>
@@ -1932,75 +2263,87 @@ export function ChatPage(props: ChatPageProps) {
                 return (
                   <div
                     key={message.id}
-                    className={`message-wrap ${isMessageActive ? "message-wrap--active" : ""}`}
+                    className={`message-wrap ${isMessageActive ? "message-wrap--active" : ""}${isContextOpen ? " message-wrap--context" : ""}`}
                     onMouseEnter={() => setHoveredMessageId(message.id)}
                     onMouseLeave={() => setHoveredMessageId((prev) => (prev === message.id ? null : prev))}
+                    onContextMenu={(event) => {
+                      if (!canInteract) return;
+                      event.preventDefault();
+                      openMessageContextMenu(message.id, event.clientX, event.clientY);
+                    }}
                   >
                     {dayLabel ? <div className="message-day-sep">{dayLabel}</div> : null}
                     {message.sender === "me" ? (
-                      <article
-                        className={`message message--me ${message.isTombstone ? "message--tombstone" : ""} ${message.isDeleted ? "message--deleted" : ""} ${message.sticker ? "message--sticker-only" : ""} ${isMessageActive ? "message--active" : ""}`}
-                        onClick={() => {
-                          if (isMessageSelectMode) toggleMessageSelection(message.id);
-                        }}
-                      >
-                        {isMessageSelectMode ? (
-                          <button
-                            type="button"
-                            className={`message__selector message__selector--me ${selectedMessageIds.includes(message.id) ? "message__selector--checked" : ""}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              toggleMessageSelection(message.id);
+                      <div className="message-row message-row--me">
+                        <div className="message-row__content">
+                          <article
+                            className={`message message--me ${message.isTombstone ? "message--tombstone" : ""} ${message.isDeleted ? "message--deleted" : ""} ${message.sticker ? "message--sticker-only" : ""} ${isMessageActive ? "message--active" : ""} ${isContextOpen ? "message--context" : ""} ${isLastInSeries ? "message--series-end" : ""}`}
+                            onClick={() => {
+                              if (isMessageSelectMode) toggleMessageSelection(message.id);
                             }}
-                            aria-label={locale === "ru" ? "Выбрать сообщение" : "Select message"}
-                          />
-                        ) : null}
-                        {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
-                        {replyPreview}
-                        <div className="message__body-row">
-                          {stickerNode ?? <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>}
-                          {disclosureBadge}
+                          >
+                            {isLastInSeries ? <MessageBubbleTail side="outgoing" /> : null}
+                            {isMessageSelectMode ? (
+                              <button
+                                type="button"
+                                className={`message__selector message__selector--me ${selectedMessageIds.includes(message.id) ? "message__selector--checked" : ""}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleMessageSelection(message.id);
+                                }}
+                                aria-label={locale === "ru" ? "Выбрать сообщение" : "Select message"}
+                              />
+                            ) : null}
+                            {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
+                            {replyPreview}
+                            <div className="message__body-row">
+                              {stickerNode ?? <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>}
+                              {disclosureBadge}
+                            </div>
+                            {mediaNode}
+                            {messageFooter}
+                            {quickReactionSlot}
+                          </article>
                         </div>
-                        {quickReactionSlot}
-                        {mediaNode}
-                        {actionBar}
-                        {reactionRow}
-                        <p className="message__time">{message.time}</p>
-                      </article>
+                        <div className="message-row__avatar-slot">
+                          {isLastInSeries ? renderMyMessageAvatar() : null}
+                        </div>
+                      </div>
                     ) : (
                       <div className="message-row">
                         <div className="message-row__avatar-slot">
-                          {isLastInSeries ? <span className="message-row__avatar">{senderInitial(message.author)}</span> : null}
+                          {isLastInSeries ? renderMessageSenderAvatar(message) : null}
                         </div>
-                        <article
-                          className={`message ${message.isTombstone ? "message--tombstone" : ""} ${message.isDeleted ? "message--deleted" : ""} ${message.sticker ? "message--sticker-only" : ""} ${isMessageActive ? "message--active" : ""}`}
-                          onClick={() => {
-                            if (isMessageSelectMode) toggleMessageSelection(message.id);
-                          }}
-                        >
-                          {isMessageSelectMode ? (
-                            <button
-                              type="button"
-                              className={`message__selector ${selectedMessageIds.includes(message.id) ? "message__selector--checked" : ""}`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                toggleMessageSelection(message.id);
-                              }}
-                              aria-label={locale === "ru" ? "Выбрать сообщение" : "Select message"}
-                            />
-                          ) : null}
-                          {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
-                          {replyPreview}
-                          <div className="message__body-row">
-                            {stickerNode ?? <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>}
-                            {disclosureBadge}
-                          </div>
-                          {quickReactionSlot}
-                          {mediaNode}
-                          {actionBar}
-                          {reactionRow}
-                          <p className="message__time">{message.time}</p>
-                        </article>
+                        <div className="message-row__content">
+                          <article
+                            className={`message ${message.isTombstone ? "message--tombstone" : ""} ${message.isDeleted ? "message--deleted" : ""} ${message.sticker ? "message--sticker-only" : ""} ${isMessageActive ? "message--active" : ""} ${isContextOpen ? "message--context" : ""} ${isLastInSeries ? "message--series-end" : ""}`}
+                            onClick={() => {
+                              if (isMessageSelectMode) toggleMessageSelection(message.id);
+                            }}
+                          >
+                            {isLastInSeries ? <MessageBubbleTail /> : null}
+                            {isMessageSelectMode ? (
+                              <button
+                                type="button"
+                                className={`message__selector ${selectedMessageIds.includes(message.id) ? "message__selector--checked" : ""}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleMessageSelection(message.id);
+                                }}
+                                aria-label={locale === "ru" ? "Выбрать сообщение" : "Select message"}
+                              />
+                            ) : null}
+                            {isFirstInSeries ? <p className="message__author">{message.author}</p> : null}
+                            {replyPreview}
+                            <div className="message__body-row">
+                              {stickerNode ?? <p className={isEmojiOnly ? "message__emoji-only" : undefined}>{message.text}</p>}
+                              {disclosureBadge}
+                            </div>
+                            {mediaNode}
+                            {messageFooter}
+                            {quickReactionSlot}
+                          </article>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2011,6 +2354,43 @@ export function ChatPage(props: ChatPageProps) {
             <div className="chat-empty-state" />
           )}
         </div>
+
+        {messageToast ? (
+          <div className="message-toast" role="status">
+            {messageToast}
+          </div>
+        ) : null}
+        {messageContextMenu && contextMenuMessage && activeChatId ? (
+          <MessageContextMenu
+            locale={locale}
+            message={contextMenuMessage}
+            x={messageContextMenu.x}
+            y={messageContextMenu.y}
+            onClose={() => setMessageContextMenu(null)}
+            onReply={(message) => onSetReplyTo(message)}
+            onForward={(message) => setMessageActionDialog({ kind: "forward", messageId: message.id })}
+            onDelete={(message) => setMessageActionDialog({ kind: "delete", messageId: message.id })}
+            onCopyText={copyMessageText}
+            onEdit={startMessageEdit}
+            onSelect={startMessageSelect}
+            onMarkImportant={() => {
+              setMessageToast(locale === "ru" ? "Важные сообщения скоро будут доступны" : "Important messages coming soon");
+            }}
+          />
+        ) : null}
+        {messageActionDialog && actionDialogMessage && activeChatId ? (
+          <MessageActionDialog
+            locale={locale}
+            kind={messageActionDialog.kind}
+            message={actionDialogMessage}
+            onClose={() => setMessageActionDialog(null)}
+            onForward={() => {
+              setMessageToast(locale === "ru" ? "Пересылка скоро будет доступна" : "Forwarding coming soon");
+            }}
+            onDeleteForSelf={(message) => void onDeleteMessage(activeChatId, message.id, "self")}
+            onDeleteForEveryone={(message) => void onDeleteMessage(activeChatId, message.id, "everyone")}
+          />
+        ) : null}
 
         {activeChat ? (
           <form
@@ -2327,340 +2707,316 @@ export function ChatPage(props: ChatPageProps) {
         ) : null}
 
       </section>
-      {activeDrawer === "profile" ? (
-        <aside className="profile-drawer" onMouseDown={() => setTopDrawer("profile")}>
-          <header className="profile-drawer__header">
-            <h3>{locale === "ru" ? "Мой аккаунт" : "My account"}</h3>
-            <button type="button" className="icon-button drawer-close-btn" onClick={() => setIsProfilePanelOpen(false)} aria-label="Close">
+      {isProfilePanelOpen ? (
+        <div
+          className="profile-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={locale === "ru" ? "Мой профиль" : "My Profile"}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeProfilePanel();
+          }}
+        >
+          <div className={`profile-modal ${isProfileEditMode ? "profile-modal--info" : ""}`} onMouseDown={(event) => event.stopPropagation()}>
+            {isProfileEditMode ? (
+              <ProfileInfoPanel
+                locale={locale}
+                authUser={authUser}
+                accessToken={accessToken}
+                userAvatarRef={userAvatarRef}
+                onlineLabel={t.online}
+                activeProfileEdit={activeProfileEdit}
+                profileName={profileName}
+                profileUsername={profileUsername}
+                profileOldPassword={profileOldPassword}
+                profileNewPassword={profileNewPassword}
+                profileConfirmPassword={profileConfirmPassword}
+                profileSubmitError={profileSubmitError}
+                profileNameError={profileNameError}
+                profileUsernameError={profileUsernameError}
+                profileOldPasswordError={profileOldPasswordError}
+                profileNewPasswordError={profileNewPasswordError}
+                profileConfirmPasswordError={profileConfirmPasswordError}
+                isAvatarClearHover={isAvatarClearHover}
+                editorTitle={profileEditorTitle}
+                fieldCaptionLine={fieldCaptionLine}
+                onBack={profileInfoBack}
+                onClose={closeProfilePanel}
+                onCopyUsername={() => void copyProfileUsername()}
+                onShowStub={showProfileStub}
+                onStartEdit={startProfileEdit}
+                onCancelEdit={cancelProfileEdit}
+                onSaveEdit={() => void saveProfileEdit()}
+                onUploadAvatar={(file) => void onUploadAvatar(file)}
+                onResetAvatar={() => void onResetAvatar()}
+                onAvatarClearHover={setIsAvatarClearHover}
+                onProfileNameChange={setProfileName}
+                onProfileUsernameChange={setProfileUsername}
+                onProfileOldPasswordChange={setProfileOldPassword}
+                onProfileNewPasswordChange={setProfileNewPassword}
+                onProfileConfirmPasswordChange={setProfileConfirmPassword}
+              />
+            ) : (
+              <>
+                <div className="profile-modal__toolbar">
+                  <button
+                    type="button"
+                    className="icon-button icon-button--ghost"
+                    onClick={() => setIsProfileEditMode(true)}
+                    aria-label={locale === "ru" ? "Редактировать профиль" : "Edit profile"}
+                  >
+                    <PencilIcon />
+                  </button>
+                  <button type="button" className="icon-button drawer-close-btn" onClick={closeProfilePanel} aria-label={locale === "ru" ? "Закрыть" : "Close"}>
+                    ×
+                  </button>
+                </div>
+                <div className="profile-modal__hero">
+                  <UserAvatar
+                    userId={authUser.id}
+                    name={authUser.displayName || authUser.username}
+                    avatarUrl={userAvatarRef ?? authUser.avatarUrl}
+                    accessToken={accessToken}
+                    className="profile-modal__avatar"
+                  />
+                  <h2 className="profile-modal__name">{authUser.displayName || authUser.username}</h2>
+                  <p className="profile-modal__status">{t.online}</p>
+                </div>
+                <div className="profile-modal__username-row">
+                  <div className="profile-modal__field">
+                    <div className="profile-modal__field-value">@{authUser.username}</div>
+                    <div className="profile-modal__field-label">{locale === "ru" ? "Имя пользователя" : "Username"}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-button icon-button--ghost profile-modal__grid-btn"
+                    onClick={() => void copyProfileUsername()}
+                    aria-label={locale === "ru" ? "Скопировать имя пользователя" : "Copy username"}
+                  >
+                    <GridIcon />
+                  </button>
+                </div>
+                <div className="profile-modal__divider" role="separator" />
+                <p className="profile-modal__stories-placeholder">
+                  {locale === "ru" ? "Здесь будут ваши истории" : "Your stories will be here"}
+                </p>
+              </>
+            )}
+            {profileModalToast ? (
+              <div className="profile-modal__toast" role="status">
+                {profileModalToast}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+      {isSettingsOpen ? (
+        <div
+          className="profile-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={locale === "ru" ? "Настройки" : "Settings"}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeSettingsPanel();
+          }}
+        >
+          <div className="profile-modal profile-modal--info settings-modal" onMouseDown={(event) => event.stopPropagation()}>
+            <SettingsModal
+              locale={locale}
+              screen={settingsScreen}
+              authUser={authUser}
+              accessToken={accessToken}
+              userAvatarRef={userAvatarRef}
+              localeLabel={locale === "ru" ? "Русский" : "English"}
+              frequentContactsEnabled={frequentContactsEnabled}
+              onClose={closeSettingsPanel}
+              onScreenChange={setSettingsScreen}
+              onOpenProfile={openProfileFromSettings}
+              onShowStub={showSettingsStub}
+              onToggleFrequentContacts={() => setFrequentContactsEnabled((prev) => !prev)}
+            />
+            {settingsToast ? (
+              <div className="profile-modal__toast" role="status">
+                {settingsToast}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+      {createChatModalKind ? (
+        <CreateGroupChatModal
+          locale={locale}
+          kind={createChatModalKind}
+          authUserId={authUser.id}
+          accessToken={accessToken}
+          onClose={() => setCreateChatModalKind(null)}
+          onSearchUsers={onSearchUsers}
+          onSubmit={submitCreateMultiMemberChat}
+        />
+      ) : null}
+      {activeDrawer === "chat" ? (
+        <aside className="profile-drawer chat-info-drawer chat-info-drawer--tg" onMouseDown={() => setTopDrawer("chat")}>
+          <header className="chat-info-drawer__header chat-info-drawer__header--tg">
+            <span aria-hidden="true" />
+            <button type="button" className="icon-button drawer-close-btn" onClick={() => setIsChatInfoOpen(false)} aria-label={locale === "ru" ? "Закрыть" : "Close"}>
               ×
             </button>
           </header>
-          <div className="avatar-block">
-            <div className="avatar-block__main">
-              <div className={`auth-avatar-picker-wrap profile-avatar-wrap ${isAvatarClearHover ? "profile-avatar-wrap--clear-hover" : ""}`}>
-                <label className="auth-avatar-picker auth-avatar-picker--profile" title={locale === "ru" ? "Изменить фото" : "Change photo"}>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(event) => onUploadAvatar(event.target.files?.[0] ?? null)}
-                  />
-                  {userAvatar ? (
-                    <img src={userAvatar} alt="" />
-                  ) : (
-                    <span className="chat-avatar profile-auto-avatar" style={{ backgroundImage: userAvatarGradient() }}>
-                      {userInitials()}
-                    </span>
-                  )}
-                  <span className="profile-avatar-overlay" aria-hidden="true">
-                    <PencilIcon />
-                  </span>
-                </label>
-                {userAvatarRef ? (
+
+          <div className="chat-info-tg">
+            <div className="chat-info-tg__hero">
+              {activeChat ? renderChatAvatar(activeChat, "chat-info-tg__avatar") : null}
+              <h4 className="chat-info-tg__title">{activeChat?.name}</h4>
+              <p className="chat-info-tg__subtitle">
+                {activeChat?.kind === "group"
+                  ? groupMembersLabel(activeChat)
+                  : activeChat?.status === "online"
+                    ? t.online
+                    : t.lastSeen}
+              </p>
+            </div>
+
+            {activeChat && (chatPhotoCount > 0 || chatVideoCount > 0 || chatFileCount > 0 || chatAudioCount > 0) ? (
+              <div className="chat-info-tg__stats">
+                {chatPhotoCount > 0 ? (
                   <button
                     type="button"
-                    className="auth-avatar-clear"
-                    onMouseEnter={() => setIsAvatarClearHover(true)}
-                    onMouseLeave={() => setIsAvatarClearHover(false)}
-                    onClick={onResetAvatar}
-                    aria-label={locale === "ru" ? "Удалить фото" : "Remove photo"}
+                    className="chat-info-tg__stat"
+                    onClick={() => setChatInfoMediaOpen((prev) => !prev)}
                   >
-                    ×
+                    <ImageIcon />
+                    <span>
+                      {chatPhotoCount}{" "}
+                      {locale === "ru"
+                        ? chatPhotoCount === 1
+                          ? "фото"
+                          : chatPhotoCount < 5
+                            ? "фото"
+                            : "фото"
+                        : chatPhotoCount === 1
+                          ? "photo"
+                          : "photos"}
+                    </span>
+                  </button>
+                ) : null}
+                {chatVideoCount > 0 ? (
+                  <button type="button" className="chat-info-tg__stat" onClick={() => setChatInfoMediaOpen(true)}>
+                    <CameraIcon />
+                    <span>
+                      {chatVideoCount} {locale === "ru" ? (chatVideoCount === 1 ? "видео" : "видео") : chatVideoCount === 1 ? "video" : "videos"}
+                    </span>
+                  </button>
+                ) : null}
+                {chatFileCount > 0 ? (
+                  <div className="chat-info-tg__stat chat-info-tg__stat--static">
+                    <FileIcon />
+                    <span>
+                      {chatFileCount} {locale === "ru" ? (chatFileCount === 1 ? "файл" : "файлов") : chatFileCount === 1 ? "file" : "files"}
+                    </span>
+                  </div>
+                ) : null}
+                {chatAudioCount > 0 ? (
+                  <div className="chat-info-tg__stat chat-info-tg__stat--static">
+                    <MicIcon />
+                    <span>
+                      {chatAudioCount} {locale === "ru" ? "аудио" : chatAudioCount === 1 ? "audio file" : "audio files"}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {chatInfoMediaOpen && chatMediaItems.length > 0 ? (
+              <div className="chat-info-media-grid chat-info-media-grid--tg">
+                {chatMediaItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="chat-info-media-grid__item"
+                    onClick={() => {
+                      setMediaPreviewUrl(item.preview ?? null);
+                      setMediaPreviewType(item.previewType === "video" ? "video" : "image");
+                    }}
+                  >
+                    {item.previewType === "video" ? <video src={item.preview} muted /> : <img src={item.preview} alt="" />}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {activeChat ? (
+              <div className={`chat-info-tg__actions ${activeChat.kind === "group" ? "" : "chat-info-tg__actions--dm"}`}>
+                <button type="button" className="chat-info-tg__action" onClick={() => activeChat && toggleChatMute(activeChat.id)}>
+                  <BellIcon />
+                  <span>{activeChatIsMuted ? (locale === "ru" ? "Включить" : "Unmute") : locale === "ru" ? "Без звука" : "Mute"}</span>
+                </button>
+                <button type="button" className="chat-info-tg__action" onClick={() => activeChat && toggleChatArchive(activeChat)}>
+                  <ArchiveIcon />
+                  <span>{activeChat.group === "archived" ? (locale === "ru" ? "Из архива" : "Unarchive") : locale === "ru" ? "Архив" : "Archive"}</span>
+                </button>
+                {activeChat.kind === "group" ? (
+                  <button
+                    type="button"
+                    className="chat-info-tg__action chat-info-tg__action--danger"
+                    onClick={() => {
+                      removeChatAction(activeChat);
+                      setIsChatInfoOpen(false);
+                    }}
+                  >
+                    <LogoutIcon />
+                    <span>{locale === "ru" ? "Выйти" : "Leave"}</span>
                   </button>
                 ) : null}
               </div>
-              <span className="profile-pill">@{authUser.username}</span>
-            </div>
-            <div className="profile-edit-fields auth-form">
-              <div className={`profile-inline-edit ${activeProfileEdit && activeProfileEdit !== "name" ? "profile-inline-edit--locked" : ""}`}>
-                <div className="profile-inline-edit__toolbar">
-                  {activeProfileEdit !== "name" ? (
-                    <button type="button" className="icon-button profile-pencil profile-pencil--hover profile-pencil--plain" onClick={() => startProfileEdit("name")} disabled={Boolean(activeProfileEdit)}>
-                      <PencilIcon />
-                    </button>
-                  ) : (
-                    <div className="profile-icon-actions">
-                      <button type="button" className="profile-icon-btn profile-icon-btn--save" onClick={() => void saveProfileEdit()} aria-label={locale === "ru" ? "Сохранить" : "Save"}>
-                        ✓
-                      </button>
-                      <button type="button" className="profile-icon-btn profile-icon-btn--cancel" onClick={cancelProfileEdit} aria-label={locale === "ru" ? "Отмена" : "Cancel"}>
-                        ×
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className={`input-group ${profileNameTrim ? "touched" : ""} ${activeProfileEdit === "name" && profileNameError ? "input-group--invalid" : ""}`}>
-                  <div className="input-group__head">
-                    <span className={`input-group__caption ${activeProfileEdit === "name" && profileNameError ? "input-group__caption--invalid" : ""}`}>
-                      <label>{fieldCaptionLine(locale === "ru" ? "Имя" : "Name", activeProfileEdit === "name" ? profileNameError : "")}</label>
-                    </span>
-                  </div>
-                  <input
-                    className="form-control"
-                    value={activeProfileEdit === "name" ? profileName : authUser.displayName}
-                    onChange={(event) => setProfileName(event.target.value)}
-                    placeholder=" "
-                    readOnly={activeProfileEdit !== "name"}
-                  />
-                </div>
-              </div>
+            ) : null}
 
-              <div className={`profile-inline-edit ${activeProfileEdit && activeProfileEdit !== "username" ? "profile-inline-edit--locked" : ""}`}>
-                <div className="profile-inline-edit__toolbar">
-                  {activeProfileEdit !== "username" ? (
-                    <button type="button" className="icon-button profile-pencil profile-pencil--hover profile-pencil--plain" onClick={() => startProfileEdit("username")} disabled={Boolean(activeProfileEdit)}>
-                      <PencilIcon />
-                    </button>
-                  ) : (
-                    <div className="profile-icon-actions">
-                      <button type="button" className="profile-icon-btn profile-icon-btn--save" onClick={() => void saveProfileEdit()} aria-label={locale === "ru" ? "Сохранить" : "Save"}>
-                        ✓
-                      </button>
-                      <button type="button" className="profile-icon-btn profile-icon-btn--cancel" onClick={cancelProfileEdit} aria-label={locale === "ru" ? "Отмена" : "Cancel"}>
-                        ×
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className={`input-group ${profileUsernameTrim ? "touched" : ""} ${activeProfileEdit === "username" && profileUsernameError ? "input-group--invalid" : ""}`}>
-                  <div className="input-group__head">
-                    <span className={`input-group__caption ${activeProfileEdit === "username" && profileUsernameError ? "input-group__caption--invalid" : ""}`}>
-                      <label>{fieldCaptionLine(locale === "ru" ? "Логин" : "Username", activeProfileEdit === "username" ? profileUsernameError : "")}</label>
-                    </span>
-                  </div>
-                  <input
-                    className="form-control"
-                    value={activeProfileEdit === "username" ? profileUsername : authUser.username}
-                    onChange={(event) => setProfileUsername(event.target.value)}
-                    placeholder=" "
-                    readOnly={activeProfileEdit !== "username"}
-                  />
-                </div>
-              </div>
-
-              <div className={`profile-inline-edit ${activeProfileEdit && activeProfileEdit !== "password" ? "profile-inline-edit--locked" : ""}`}>
-                <div className="profile-inline-edit__toolbar profile-inline-edit__toolbar--password">
-                  {activeProfileEdit === "password" ? <span className="profile-password-title">{locale === "ru" ? "Смена пароля" : "Password change"}</span> : null}
-                  {activeProfileEdit !== "password" ? (
-                    <button type="button" className="ghost-button profile-change-password" onClick={() => startProfileEdit("password")} disabled={Boolean(activeProfileEdit && activeProfileEdit !== "password")}>
-                      {locale === "ru" ? "Сменить пароль" : "Change password"}
-                    </button>
-                  ) : null}
-                </div>
-                {activeProfileEdit === "password" ? (
-                  <>
-                    <div className="profile-password-stack">
-                      <div className={`input-group ${profileOldPasswordTrim ? "touched" : ""} ${profileOldPasswordError ? "input-group--invalid" : ""}`}>
-                        <div className="input-group__head">
-                          <span className={`input-group__caption ${profileOldPasswordError ? "input-group__caption--invalid" : ""}`}>
-                            <label>{fieldCaptionLine(locale === "ru" ? "Старый пароль" : "Current password", profileOldPasswordError)}</label>
-                          </span>
-                        </div>
-                        <input className="form-control" type="password" value={profileOldPassword} onChange={(event) => setProfileOldPassword(event.target.value)} placeholder=" " />
-                      </div>
-                      <div className={`input-group ${profileNewPasswordTrim ? "touched" : ""} ${profileNewPasswordError ? "input-group--invalid" : ""}`}>
-                        <div className="input-group__head">
-                          <span className={`input-group__caption ${profileNewPasswordError ? "input-group__caption--invalid" : ""}`}>
-                            <label>{fieldCaptionLine(locale === "ru" ? "Новый пароль" : "New password", profileNewPasswordError)}</label>
-                          </span>
-                        </div>
-                        <input className="form-control" type="password" value={profileNewPassword} onChange={(event) => setProfileNewPassword(event.target.value)} placeholder=" " />
-                      </div>
-                      <div className={`input-group ${profileConfirmPasswordTrim ? "touched" : ""} ${profileConfirmPasswordError ? "input-group--invalid" : ""}`}>
-                        <div className="input-group__head">
-                          <span className={`input-group__caption ${profileConfirmPasswordError ? "input-group__caption--invalid" : ""}`}>
-                            <label>{fieldCaptionLine(locale === "ru" ? "Повтор пароля" : "Repeat password", profileConfirmPasswordError)}</label>
-                          </span>
-                        </div>
-                        <input className="form-control" type="password" value={profileConfirmPassword} onChange={(event) => setProfileConfirmPassword(event.target.value)} placeholder=" " />
-                      </div>
-                    </div>
-                    <div className="profile-password-actions">
-                      <button type="button" className="profile-icon-btn profile-icon-btn--save" onClick={() => void saveProfileEdit()} aria-label={locale === "ru" ? "Сохранить" : "Save"}>
-                        ✓
-                      </button>
-                      <button type="button" className="profile-icon-btn profile-icon-btn--cancel" onClick={cancelProfileEdit} aria-label={locale === "ru" ? "Отмена" : "Cancel"}>
-                        ×
-                      </button>
-                    </div>
-                  </>
-                ) : null}
-              </div>
-              {profileSubmitError ? <p className="auth-error profile-password-error">{profileSubmitError}</p> : null}
-            </div>
-          </div>
-        </aside>
-      ) : null}
-      {activeDrawer === "chat" ? (
-        <aside className="profile-drawer chat-info-drawer" onMouseDown={() => setTopDrawer("chat")}>
-          <header className="chat-info-drawer__header">
-            <button type="button" className="icon-button drawer-close-btn" onClick={() => setIsChatInfoOpen(false)} aria-label="Close">
-              ×
-            </button>
-            <h3>{locale === "ru" ? "Данные чата" : "Chat details"}</h3>
-            <button
-              type="button"
-              className="icon-button chat-info-drawer__edit-btn"
-              onClick={() => {
-                setIsChatInfoEditMode(true);
-              }}
-              aria-label={locale === "ru" ? "Редактировать" : "Edit"}
-            >
-              <PencilIcon />
-            </button>
-          </header>
-          <div className="chat-info-main">
-            <div className="chat-info-main__hero">
-              {activeChatInfoAvatar || chatInfoDraftAvatar ? (
-                <img src={chatInfoDraftAvatar ?? activeChatInfoAvatar ?? ""} alt="" className="chat-info-main__avatar" />
-              ) : (
-                activeChat ? renderChatAvatar(activeChat, "chat-info-main__avatar") : null
-              )}
-              {isChatInfoEditMode ? (
-                <label className="avatar-upload chat-info-main__upload">
-                  {locale === "ru" ? "Обновить фото" : "Update photo"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        if (typeof reader.result === "string") setChatInfoDraftAvatar(reader.result);
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                </label>
-              ) : null}
-              {isChatInfoEditMode ? (
-                <input
-                  className="chat-info-main__title-input"
-                  value={canEditChatMeta ? chatInfoDraftName : activeChat?.name ?? ""}
-                  onChange={(event) => setChatInfoDraftName(event.target.value)}
-                  placeholder={locale === "ru" ? "Название" : "Title"}
-                  disabled={!canEditChatMeta}
-                />
-              ) : (
-                <h4>{activeChatAlias || activeChat?.name}</h4>
-              )}
-              <p>{activeChat?.kind === "group" ? `${groupMembersCount(activeChat)} ${locale === "ru" ? "участников" : "members"}` : (locale === "ru" ? "Личный чат" : "Direct chat")}</p>
-            </div>
-            <section className="chat-info-main__card">
-              <h5><BellIcon />{locale === "ru" ? "Уведомления" : "Notifications"}</h5>
-              <p>{locale === "ru" ? "Включены для этого чата." : "Enabled for this chat."}</p>
-            </section>
-            <section className="chat-info-main__card">
-              <h5><LinkIcon />{locale === "ru" ? "Внутренняя ссылка" : "Internal link"}</h5>
-              <p><strong>@</strong>{chatPublicHandle(activeChat)}</p>
-              <small>{chatInternalUrl(activeChat)}</small>
-            </section>
             {activeChat?.kind === "group" ? (
-              <section className="chat-info-main__card">
-                <h5><UsersIcon />{locale === "ru" ? "Участники" : "Members"}</h5>
-                <p>{locale === "ru" ? `Админов: ${groupAdminsCount(activeChat)} · Пользователей: ${groupMembersCount(activeChat)} · Удалено: ${groupRemovedCount(activeChat)}` : `Admins: ${groupAdminsCount(activeChat)} · Users: ${groupMembersCount(activeChat)} · Removed: ${groupRemovedCount(activeChat)}`}</p>
+              <section className="chat-info-tg__members">
+                <header className="chat-info-tg__members-head">
+                  <h5>
+                    {groupMembersCount(activeChat)} {locale === "ru" ? "УЧАСТНИКОВ" : "MEMBERS"}
+                  </h5>
+                  <label className="chat-info-tg__members-search">
+                    <SearchIcon />
+                    <input
+                      type="search"
+                      value={chatInfoMemberQuery}
+                      onChange={(event) => setChatInfoMemberQuery(event.target.value)}
+                      placeholder={locale === "ru" ? "Поиск" : "Search"}
+                      aria-label={locale === "ru" ? "Поиск участников" : "Search members"}
+                    />
+                  </label>
+                </header>
+                {chatInfoMembers.length > 0 ? (
+                  <ul className="chat-info-members chat-info-members--tg">
+                    {chatInfoMembers.map((member) => (
+                      <li key={member.id} className="chat-info-members__row">
+                        <UserAvatar
+                          userId={member.id}
+                          name={member.displayName || member.username}
+                          avatarUrl={member.avatarUrl}
+                          accessToken={accessToken}
+                          className="chat-info-members__avatar"
+                        />
+                        <span className="chat-info-members__text">
+                          <span className="chat-info-members__name">{member.displayName || member.username}</span>
+                          <span className="chat-info-members__meta">
+                            {member.id === authUser.id
+                              ? locale === "ru"
+                                ? "вы"
+                                : "you"
+                              : `@${member.username}`}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="chat-info-tg__empty">{locale === "ru" ? "Никого не найдено" : "No members found"}</p>
+                )}
               </section>
-            ) : null}
-            {isChatInfoEditMode && canEditChatMeta ? (
-              <section className="chat-info-main__card">
-                <h5><InfoIcon />{locale === "ru" ? "Описание группы" : "Group description"}</h5>
-                <textarea className="chat-info-main__textarea" value={chatInfoDraftDescription} onChange={(event) => setChatInfoDraftDescription(event.target.value)} />
-              </section>
-            ) : activeChatDescription ? (
-              <section className="chat-info-main__card">
-                <h5><InfoIcon />{locale === "ru" ? "Описание группы" : "Group description"}</h5>
-                <p>{activeChatDescription}</p>
-              </section>
-            ) : null}
-            {isChatInfoEditMode && canEditAlias ? (
-              <section className="chat-info-main__card">
-                <h5><PencilIcon />{locale === "ru" ? "Отображаемое имя" : "Display name"}</h5>
-                <input className="chat-info-main__title-input" value={chatInfoDraftAlias} onChange={(event) => setChatInfoDraftAlias(event.target.value)} placeholder={locale === "ru" ? "Имя и фамилия" : "Name and surname"} />
-              </section>
-            ) : null}
-            {canDeleteContact ? (
-              <button type="button" className="ghost-button chat-info-main__danger">
-                {locale === "ru" ? "Удалить контакт" : "Delete contact"}
-              </button>
             ) : null}
           </div>
-          <div className="chat-info-sections">
-            <div className="chat-info-sections__tabs" role="tablist" aria-label={locale === "ru" ? "Разделы чата" : "Chat sections"}>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeChatInfoSection === "media"}
-                className={`chat-info-sections__tab ${activeChatInfoSection === "media" ? "chat-info-sections__tab--active" : ""}`}
-                onClick={() => setActiveChatInfoSection("media")}
-              >
-                <ImageIcon />
-                {locale === "ru" ? "Медиа" : "Media"}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeChatInfoSection === "files"}
-                className={`chat-info-sections__tab ${activeChatInfoSection === "files" ? "chat-info-sections__tab--active" : ""}`}
-                onClick={() => setActiveChatInfoSection("files")}
-              >
-                <FileIcon />
-                {locale === "ru" ? "Файлы" : "Files"}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeChatInfoSection === "groups"}
-                className={`chat-info-sections__tab ${activeChatInfoSection === "groups" ? "chat-info-sections__tab--active" : ""}`}
-                onClick={() => setActiveChatInfoSection("groups")}
-              >
-                <UsersIcon />
-                {locale === "ru" ? "Группы" : "Groups"}
-              </button>
-            </div>
-            <section className="chat-info-sections__panel" role="tabpanel">
-              {activeChatInfoSection === "media" ? (
-                <>
-                  <h4><ImageIcon />{locale === "ru" ? "Медиа" : "Media"}</h4>
-                  <div className="chat-info-media-grid">
-                    {chatMediaItems.length ? chatMediaItems.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className="chat-info-media-grid__item"
-                        onClick={() => {
-                          setMediaPreviewUrl(item.preview ?? null);
-                          setMediaPreviewType(item.previewType === "video" ? "video" : "image");
-                        }}
-                      >
-                        {item.previewType === "video" ? <video src={item.preview} muted /> : <img src={item.preview} alt="" />}
-                      </button>
-                    )) : <p>{locale === "ru" ? "Пока нет медиа." : "No media yet."}</p>}
-                  </div>
-                </>
-              ) : null}
-              {activeChatInfoSection === "files" ? (
-                <>
-                  <h4><FileIcon />{locale === "ru" ? "Файлы" : "Files"}</h4>
-                  <p>{chatFileItems.length ? `${chatFileItems.length} ${locale === "ru" ? "файлов/аудио" : "files/audio"}` : (locale === "ru" ? "Пока нет файлов." : "No files yet.")}</p>
-                </>
-              ) : null}
-              {activeChatInfoSection === "groups" ? (
-                <>
-                  <h4><UsersIcon />{locale === "ru" ? "Группы" : "Groups"}</h4>
-                  <p>{locale === "ru" ? "Связанные общие группы будут отображены здесь." : "Related shared groups will appear here."}</p>
-                </>
-              ) : null}
-            </section>
-          </div>
-          {isChatInfoEditMode ? (
-            <div className="chat-info-save-wrap">
-              <button type="button" className="chat-list__new-chat-btn chat-info-save-btn" onClick={saveChatInfoChanges} aria-label={locale === "ru" ? "Сохранить" : "Save"} title={locale === "ru" ? "Сохранить" : "Save"}>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M9.55 17.2 4.8 12.45l1.4-1.4 3.35 3.35 8.25-8.25 1.4 1.4z" />
-                </svg>
-              </button>
-            </div>
-          ) : null}
         </aside>
       ) : null}
       {isStickerManagerOpen ? (

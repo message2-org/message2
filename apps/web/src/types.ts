@@ -9,6 +9,13 @@ export type AuthUser = {
 
 export type ChatGroup = "favorite" | "regular" | "archived";
 
+export type ChatMemberPreview = {
+  id: string;
+  displayName: string;
+  username: string;
+  avatarUrl?: string | null;
+};
+
 export type ChatItem = {
   id: string;
   group: ChatGroup;
@@ -17,6 +24,10 @@ export type ChatItem = {
   peerUserId?: string;
   /** DM peer username (other user), for search by @handle */
   peerUsername?: string;
+  /** DM peer profile avatar ref (`media:<id>`, data URL, https). */
+  peerAvatarUrl?: string | null;
+  /** Group/channel members (for sender avatars in messages). */
+  members?: ChatMemberPreview[];
   name: string;
   status: "online" | "offline";
   lastMessage: string;
@@ -36,6 +47,7 @@ export type MessageDisclosure = {
 export type MessageReaction = {
   emoji: string;
   count: number;
+  userIds?: string[];
   reactedByMe?: boolean;
 };
 
@@ -49,6 +61,8 @@ export type MessageReplyPreview = {
 export type Message = {
   id: string;
   sender: "me" | "them";
+  senderUserId?: string;
+  senderAvatarUrl?: string | null;
   author: string;
   text: string;
   time: string;

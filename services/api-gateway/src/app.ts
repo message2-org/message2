@@ -3,8 +3,10 @@ import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import swaggerUi from "swagger-ui-express";
 import { randomUUID } from "node:crypto";
 import { readInstanceProfileFromEnv } from "@message2/contracts";
+import { loadOpenApiSpec } from "./openapi.js";
 
 export const createGatewayApp = () => {
   const app = express();
@@ -23,8 +25,6 @@ export const createGatewayApp = () => {
     }
   };
   app.use(cors(corsOptions));
-  app.use(helmet());
-  app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
   app.set("trust proxy", 1);
 
   app.use((req, res, next) => {
@@ -33,6 +33,22 @@ export const createGatewayApp = () => {
     res.setHeader("x-request-id", requestId);
     next();
   });
+
+  const openApiSpec = loadOpenApiSpec();
+  app.get("/openapi.json", (_req, res) => {
+    res.json(openApiSpec);
+  });
+  app.use(
+    "/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(openApiSpec, {
+      customSiteTitle: "Message2 API",
+      swaggerOptions: { persistAuthorization: true }
+    })
+  );
+
+  app.use(helmet());
+  app.use(rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false }));
 
   app.get("/health", (_req, res) =>
     res.json({
@@ -49,6 +65,7 @@ export const createGatewayApp = () => {
   const withRequestHeaders = createProxyMiddleware({
     target: process.env.MESSAGING_URL ?? "http://localhost:4001",
     changeOrigin: true,
+    ws: true,
     pathRewrite: { "^/messaging": "" },
     on: {
       proxyReq: (proxyReq, req) => {

@@ -15,3 +15,13 @@ test("summarizeReactions groups by emoji and marks viewer", () => {
   assert.equal(thumbs.count, 2);
   assert.equal(thumbs.reactedByMe, true);
 });
+
+test("summarizeReactions preserves reactor order within emoji", () => {
+  const rows = [
+    { emoji: "👍", userId: "u1" },
+    { emoji: "👍", userId: "u2" },
+    { emoji: "👍", userId: "u3" }
+  ];
+  const summary = summarizeReactions(rows);
+  assert.deepEqual(summary[0]?.userIds, ["u1", "u2", "u3"]);
+});

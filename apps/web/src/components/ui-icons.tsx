@@ -213,6 +213,124 @@ export function SettingsIcon() {
   );
 }
 
+export function LockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="6.5" y="10.5" width="11" height="9" rx="1.8" fill="none" stroke="currentColor" strokeWidth="1.9" />
+      <path d="M9 10.5V8.4a3 3 0 0 1 6 0v2.1" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function FolderIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4.5 7.2h5.2l1.4 1.6h8.4a1.4 1.4 0 0 1 1.4 1.4v7.4a1.4 1.4 0 0 1-1.4 1.4H4.5a1.4 1.4 0 0 1-1.4-1.4V8.6a1.4 1.4 0 0 1 1.4-1.4Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function SlidersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 8h11M18 8h1M5 12h6M13 12h6M5 16h8M15 16h4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <circle cx="17" cy="8" r="1.8" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+      <circle cx="14" cy="16" r="1.8" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 4.2 6.5 6.4v5.4c0 3.4 2.3 5.8 5.5 7.2 3.2-1.4 5.5-3.8 5.5-7.2V6.4L12 4.2Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function ClockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" strokeWidth="1.9" />
+      <path d="M12 8v4.4l2.8 1.6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function MailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4.5" y="6.8" width="15" height="10.4" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m5.2 7.8 6.8 5 6.8-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function DevicesIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4.5" y="6" width="10" height="14" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="14.5" y="9" width="5" height="9" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+export function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3.5 12s3.2-5.5 8.5-5.5 8.5 5.5 8.5 5.5-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="2.4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+export function BatteryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4.5" y="8.5" width="14" height="7" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M20.5 11v3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M7 11.5h7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function ChatBubbleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.5 6.5h11a2 2 0 0 1 2 2v6.5a2 2 0 0 1-2 2H11l-3.5 3v-3h-1a2 2 0 0 1-2-2v-6.5a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function QuestionIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" strokeWidth="1.9" />
+      <path d="M9.8 9.2a2.4 2.4 0 0 1 4.4 1.2c0 1.6-2.2 1.8-2.2 3.3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="16.8" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function LightbulbIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9.5 18.5h5M10 21h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M12 4.5a5 5 0 0 1 3.2 8.9V15H8.8v-1.6A5 5 0 0 1 12 4.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function StoreIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 10.5 6.8 5.8h10.4L19 10.5v7.2a1.3 1.3 0 0 1-1.3 1.3H6.3a1.3 1.3 0 0 1-1.3-1.3V10.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M5 10.5h14" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 export function DotsVerticalIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -296,6 +414,28 @@ export function ImageIcon() {
       <rect x="3.5" y="4.5" width="17" height="15" rx="2" fill="none" stroke="currentColor" strokeWidth="1.9" />
       <circle cx="9" cy="10" r="1.6" fill="currentColor" />
       <path d="m6 17 4.5-4.5 2.7 2.7 2.3-2.3L18 17" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function MegaphoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M4.5 9.5v5L9 15.5l6.5 4.5V4L9 8.5H4.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16.5 8.2a3.2 3.2 0 0 1 0 7.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+      <path d="M19.5 7v10" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
     </svg>
   );
 }
@@ -392,6 +532,148 @@ export function SendPlaneIcon() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M3.5 11.6 20.8 4l-4.9 16-4.4-5.2-8 1.6Z" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
       <line x1="11.6" y1="14.8" x2="20.2" y2="4.4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function ReplyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M9.5 8.5 5 12l4.5 3.5V13h4.2a4.8 4.8 0 0 1 4.8 4.8V19"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function ForwardIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M14.5 8.5 19 12l-4.5 3.5V13h-4.2a4.8 4.8 0 0 0-4.8 4.8V19"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function AtIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.9" />
+      <path
+        d="M16 8.2v2.6a3.2 3.2 0 1 1-2.4 3.1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+      <path d="M16 8.2h2.2" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function GiftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4.5" y="10.5" width="15" height="9" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 10.5v9" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M4.5 10.5h15V8.8a1.8 1.8 0 0 0-1.8-1.8H6.3a1.8 1.8 0 0 0-1.8 1.8v1.7Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M10.1 7a2.2 2.2 0 0 0 1.9 1.1c1.5 0 2.4-1.1 2.4-2.2S13.1 3.8 12 3.8s-1.9.9-1.9 2.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function SparkleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3.5 13.4 8.6 18.5 10 13.4 11.4 12 16.5 10.6 11.4 5.5 10 10.6 8.6 12 3.5Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M18.8 4.2 19.3 6 21.1 6.5 19.3 7 18.8 8.8 18.3 7 16.5 6.5 18.3 6 18.8 4.2Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function PlusCircleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth="1.9" />
+      <path d="M12 8.5v7M8.5 12h7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function GridIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="5" y="5" width="6" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="13" y="5" width="6" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="5" y="13" width="6" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="13" y="13" width="6" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+export function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="8.5" y="8.5" width="10" height="10" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.9" />
+      <path d="M7.5 15.5h-1.2a1.8 1.8 0 0 1-1.8-1.8v-9A1.8 1.8 0 0 1 6.3 3h9a1.8 1.8 0 0 1 1.8 1.8v1.2" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function ChevronLeftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <polyline points="15,6 9,12 15,18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <polyline points="9,6 15,12 9,18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function ChevronDownIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <polyline points="6,9 12,15 18,9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function PhoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M8.2 4.8c.4-.9 1.3-1.4 2.3-1.2l2 .4c1 .2 1.7 1 1.7 2v2.1c0 .8-.5 1.5-1.2 1.8l-1.3.6c1.2 2.4 3.1 4.3 5.5 5.5l.6-1.3c.3-.7 1-.1.2 1.2v2.1c0 1-.8 1.8-1.8 1.7l-2-.4c-5.2-1-9.3-5.1-10.3-10.3l-.4-2Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function SelectCircleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth="1.9" />
+      <polyline points="8.5,12.2 11,14.7 16,9.7" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

@@ -12,7 +12,7 @@ type MessageRow = {
   editedAt: Date | null;
   deletedAt: Date | null;
   replyToMessageId: string | null;
-  sender?: { displayName: string };
+  sender?: { displayName: string; avatarUrl?: string | null };
   replyTo?: {
     id: string;
     senderId: string;
@@ -26,6 +26,7 @@ type MessageRow = {
 
 export type EnvelopeExtras = {
   senderDisplayName?: string;
+  senderAvatarUrl?: string | null;
   disclosure?: MessageDisclosureMark;
   isTombstone?: boolean;
   tombstoneLabel?: string;
@@ -79,13 +80,14 @@ export function rowToEnvelope(row: MessageRow, viewerId?: string, extras?: Envel
     ...extras
   };
   if (row.sender?.displayName) envelope.senderDisplayName = row.sender.displayName;
+  if (row.sender && "avatarUrl" in row.sender) envelope.senderAvatarUrl = row.sender.avatarUrl ?? null;
   return envelope;
 }
 
 export const messageInclude = {
-  sender: { select: { displayName: true } },
+  sender: { select: { displayName: true, avatarUrl: true } },
   disclosures: true,
-  reactions: { select: { emoji: true, userId: true } },
+  reactions: { select: { emoji: true, userId: true }, orderBy: { createdAt: "asc" as const } },
   replyTo: {
     select: {
       id: true,

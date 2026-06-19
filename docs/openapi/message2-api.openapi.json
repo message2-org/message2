@@ -1,0 +1,794 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Message2 API",
+    "description": "Client-facing HTTP API for Message2 (Послание2). All messaging routes are proxied through the API gateway under `/messaging`. WebSocket realtime: `GET /messaging/ws?token=<accessToken>` (upgrade). Lawful external API is available only when `deploymentProfile=public` and `lawfulAccessEnabled=true`.",
+    "version": "0.1.0",
+    "contact": {
+      "name": "Message2",
+      "url": "https://github.com/message2-org/message2"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4000",
+      "description": "Local API gateway (default dev)"
+    }
+  ],
+  "tags": [
+    { "name": "Gateway", "description": "Gateway health and documentation" },
+    { "name": "Auth", "description": "Registration, login, session" },
+    { "name": "Instance", "description": "Deployment profile and instance settings" },
+    { "name": "Chats", "description": "Chat list, create, discover users" },
+    { "name": "Messages", "description": "Messages, read receipts, typing, reactions" },
+    { "name": "Stickers", "description": "Sticker packs and search" },
+    { "name": "Media", "description": "Upload and download attachments" },
+    { "name": "Push", "description": "Web Push and FCM device registration" },
+    { "name": "Transparency", "description": "Lawful access user notices (public profile only)" },
+    { "name": "E2EE", "description": "End-to-end encryption prekey bundles" },
+    { "name": "Encryption", "description": "Per-chat encryption mode policy" },
+    { "name": "Lawful", "description": "External lawful access API (authorities, public profile only)" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Gateway"],
+        "summary": "Gateway health",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayHealth" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messaging/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthSession" }
+              }
+            }
+          },
+          "409": { "description": "Username already exists" }
+        }
+      }
+    },
+    "/messaging/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login with username and password",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthSession" }
+              }
+            }
+          },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/messaging/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Refresh access token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refreshToken"],
+                "properties": {
+                  "refreshToken": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New tokens",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthSession" }
+              }
+            }
+          },
+          "401": { "description": "Invalid refresh token" }
+        }
+      }
+    },
+    "/messaging/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Current user profile",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserProfile" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messaging/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Logout current refresh session",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "204": { "description": "Logged out" } }
+      }
+    },
+    "/messaging/instance/profile": {
+      "get": {
+        "tags": ["Instance"],
+        "summary": "Instance deployment profile",
+        "responses": {
+          "200": {
+            "description": "Profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InstanceProfile" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messaging/chats": {
+      "get": {
+        "tags": ["Chats"],
+        "summary": "List chats for current user",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Chat list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ChatSummary" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Chats"],
+        "summary": "Create DM or group chat",
+        "description": "Pass one member id for DM (returns existing DM if found). Pass multiple ids for a group.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateChatRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Chat created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChatCreated" } } } },
+          "200": { "description": "Existing DM returned" }
+        }
+      }
+    },
+    "/messaging/discover": {
+      "get": {
+        "tags": ["Chats"],
+        "summary": "Search users by username or display name",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Search string (optional @ prefix is stripped)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/DiscoverUser" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messaging/chats/{chatId}/messages": {
+      "get": {
+        "tags": ["Messages"],
+        "summary": "List messages in chat",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+        "responses": {
+          "200": {
+            "description": "Messages with tombstones and disclosure marks",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageListResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Messages"],
+        "summary": "Send a message",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendMessageRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageEnvelope" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messaging/chats/{chatId}/messages/{messageId}": {
+      "patch": {
+        "tags": ["Messages"],
+        "summary": "Edit own message",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/chatId" },
+          { "$ref": "#/components/parameters/messageId" }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["cipherText"],
+                "properties": { "cipherText": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated message" } }
+      },
+      "delete": {
+        "tags": ["Messages"],
+        "summary": "Delete message (soft delete for sender; hide for others)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/chatId" },
+          { "$ref": "#/components/parameters/messageId" }
+        ],
+        "responses": { "204": { "description": "Deleted or hidden" } }
+      }
+    },
+    "/messaging/chats/{chatId}/messages/{messageId}/reactions": {
+      "put": {
+        "tags": ["Messages"],
+        "summary": "Set reactions on a message",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/chatId" },
+          { "$ref": "#/components/parameters/messageId" }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "emoji": { "type": "string", "example": "👍" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated reactions" } }
+      }
+    },
+    "/messaging/chats/{chatId}/read": {
+      "post": {
+        "tags": ["Messages"],
+        "summary": "Mark chat as read",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+        "responses": { "204": { "description": "Read cursor updated" } }
+      }
+    },
+    "/messaging/chats/{chatId}/typing": {
+      "post": {
+        "tags": ["Messages"],
+        "summary": "Broadcast typing indicator",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "isTyping": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        "responses": { "204": { "description": "Typing event sent" } }
+      }
+    },
+    "/messaging/sticker-packs": {
+      "get": {
+        "tags": ["Stickers"],
+        "summary": "List sticker packs",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Sticker packs" } }
+      }
+    },
+    "/messaging/stickers/search": {
+      "get": {
+        "tags": ["Stickers"],
+        "summary": "Search stickers",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "query", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Search results" } }
+      }
+    },
+    "/media/upload": {
+      "post": {
+        "tags": ["Media"],
+        "summary": "Upload a file",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Uploaded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mediaId": { "type": "string", "format": "uuid" },
+                    "mimeType": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/media/objects/{mediaId}/content": {
+      "get": {
+        "tags": ["Media"],
+        "summary": "Download media content",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "mediaId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Binary content" },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/notifications/push/config": {
+      "get": {
+        "tags": ["Push"],
+        "summary": "Web Push VAPID public key",
+        "responses": { "200": { "description": "Push configuration" } }
+      }
+    },
+    "/notifications/push/web/subscribe": {
+      "post": {
+        "tags": ["Push"],
+        "summary": "Register Web Push subscription",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Subscribed" } }
+      }
+    },
+    "/notifications/push/fcm/register": {
+      "post": {
+        "tags": ["Push"],
+        "summary": "Register FCM device token (Android)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token"],
+                "properties": {
+                  "token": { "type": "string" },
+                  "platform": { "type": "string", "example": "android" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Registered" } }
+      }
+    },
+    "/messaging/transparency/notices": {
+      "get": {
+        "tags": ["Transparency"],
+        "summary": "List transparency notices for current user",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Notices" } }
+      }
+    },
+    "/messaging/transparency/notices/{eventId}": {
+      "get": {
+        "tags": ["Transparency"],
+        "summary": "Transparency notice detail",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": { "200": { "description": "Notice detail" } }
+      }
+    },
+    "/messaging/transparency/complaints": {
+      "post": {
+        "tags": ["Transparency"],
+        "summary": "File a complaint about a transparency event",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Complaint filed" } }
+      }
+    },
+    "/messaging/e2ee/users/{userId}/bundle": {
+      "get": {
+        "tags": ["E2EE"],
+        "summary": "Fetch prekey bundle for a user",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": { "200": { "description": "Prekey bundle" } }
+      }
+    },
+    "/messaging/chats/{chatId}/encryption": {
+      "get": {
+        "tags": ["Encryption"],
+        "summary": "Get chat encryption mode",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+        "responses": { "200": { "description": "Encryption state" } }
+      },
+      "post": {
+        "tags": ["Encryption"],
+        "summary": "Request encryption mode change",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/chatId" }],
+        "responses": { "200": { "description": "Updated or downgrade request created" } }
+      }
+    },
+    "/lawful/v1/operations": {
+      "post": {
+        "tags": ["Lawful"],
+        "summary": "Submit privileged lawful access operation",
+        "description": "Available only on public deployment profile. Production: mTLS client certificate. Dev: header `x-lawful-api-secret`.",
+        "security": [{ "lawfulApiSecret": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LawfulOperationRequest" },
+              "example": {
+                "action": "message_read",
+                "legalRef": "2026-lawful-api-001",
+                "reasonCode": "court_order",
+                "reasonText": "Подробное обоснование служебного доступа с достаточным количеством символов для прохождения валидации платформы.",
+                "scope": {
+                  "chatId": "550e8400-e29b-41d4-a716-446655440000",
+                  "messageIds": ["6ba7b810-9dad-11d1-80b4-00c04fd43008"]
+                },
+                "requester": { "orgId": "mvd", "officerId": "officer-1" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LawfulOperationAccepted" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Corporate profile or lawful disabled" },
+          "404": { "description": "Lawful route not exposed on gateway" },
+          "409": { "description": "Duplicate operation idempotency key" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Access token from login/register/refresh"
+      },
+      "lawfulApiSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-lawful-api-secret",
+        "description": "Dev-only shared secret (see LAWFUL_API_SHARED_SECRET). Production uses mTLS."
+      }
+    },
+    "parameters": {
+      "chatId": {
+        "name": "chatId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "messageId": {
+        "name": "messageId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    },
+    "schemas": {
+      "GatewayHealth": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "service": { "type": "string" },
+          "deploymentProfile": { "type": "string", "enum": ["public", "corporate"] },
+          "lawfulAccessEnabled": { "type": "boolean" },
+          "userTransparencyEnabled": { "type": "boolean" },
+          "lawfulRouteExposed": { "type": "boolean" }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": { "type": "string" },
+          "password": { "type": "string", "format": "password" },
+          "displayName": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "avatarUrl": { "type": "string", "nullable": true }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": { "type": "string" },
+          "password": { "type": "string", "format": "password" }
+        }
+      },
+      "AuthSession": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "displayName": { "type": "string" },
+          "username": { "type": "string" },
+          "avatarUrl": { "type": "string", "nullable": true },
+          "role": { "type": "string", "enum": ["user", "admin"] },
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" }
+        }
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "displayName": { "type": "string" },
+          "username": { "type": "string" },
+          "avatarUrl": { "type": "string", "nullable": true },
+          "role": { "type": "string" }
+        }
+      },
+      "InstanceProfile": {
+        "type": "object",
+        "properties": {
+          "deploymentProfile": { "type": "string", "enum": ["public", "corporate"] },
+          "lawfulAccessEnabled": { "type": "boolean" },
+          "userTransparencyEnabled": { "type": "boolean" },
+          "corporateConnectivity": { "type": "string" }
+        }
+      },
+      "CreateChatRequest": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "example": "Project team" },
+          "members": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" },
+            "description": "User ids excluding self (author is added automatically)"
+          }
+        }
+      },
+      "ChatCreated": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "members": { "type": "array", "items": { "type": "string", "format": "uuid" } }
+        }
+      },
+      "DiscoverUser": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "username": { "type": "string" },
+          "displayName": { "type": "string" },
+          "avatarUrl": { "type": "string", "nullable": true }
+        }
+      },
+      "ChatMember": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "displayName": { "type": "string" },
+          "username": { "type": "string" },
+          "avatarUrl": { "type": "string", "nullable": true },
+          "lastReadAt": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "ChatSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "kind": { "type": "string", "enum": ["dm", "group"] },
+          "members": { "type": "array", "items": { "$ref": "#/components/schemas/ChatMember" } },
+          "peerUserId": { "type": "string", "format": "uuid" },
+          "peerStatus": { "type": "string", "enum": ["online", "offline"] },
+          "lastDelivery": { "type": "string", "enum": ["sent", "read"], "nullable": true }
+        }
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "required": ["cipherText"],
+        "properties": {
+          "cipherText": { "type": "string", "description": "Plain text or encrypted payload JSON" },
+          "kind": { "type": "string", "default": "text", "example": "text" },
+          "mediaId": { "type": "string", "format": "uuid" },
+          "replyToMessageId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "MessageEnvelope": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "chatId": { "type": "string", "format": "uuid" },
+          "senderId": { "type": "string", "format": "uuid" },
+          "cipherText": { "type": "string" },
+          "kind": { "type": "string" },
+          "sentAt": { "type": "string", "format": "date-time" },
+          "editedAt": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "MessageListResponse": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/MessageEnvelope" }
+          },
+          "tombstones": { "type": "array", "items": { "type": "object" } },
+          "disclosures": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "LawfulOperationRequest": {
+        "type": "object",
+        "required": ["action", "legalRef", "reasonCode", "reasonText", "scope"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["message_read", "message_delete", "user_metadata_read"]
+          },
+          "legalRef": { "type": "string", "description": "Court order or legal reference id" },
+          "reasonCode": { "type": "string", "example": "court_order" },
+          "reasonText": { "type": "string", "minLength": 120 },
+          "scope": {
+            "type": "object",
+            "properties": {
+              "chatId": { "type": "string", "format": "uuid" },
+              "chatIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+              "messageIds": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+              "userIds": { "type": "array", "items": { "type": "string", "format": "uuid" } }
+            }
+          },
+          "requester": {
+            "type": "object",
+            "properties": {
+              "orgId": { "type": "string" },
+              "officerId": { "type": "string" }
+            }
+          }
+        }
+      },
+      "LawfulOperationAccepted": {
+        "type": "object",
+        "properties": {
+          "privilegedOperationId": { "type": "string" },
+          "transparencyEventIds": { "type": "array", "items": { "type": "string" } },
+          "disclosureLevel": { "type": "string", "example": "partial" }
+        }
+      }
+    }
+  }
+}

@@ -2,7 +2,7 @@ import type express from "express";
 import type { PrismaClient } from "@prisma/client";
 import type { MessageDisclosureMark } from "@message2/contracts";
 import { broadcastToUsers } from "./realtime.js";
-import { getChatMemberIds, messageInclude, rowToEnvelope } from "./message-envelope.js";
+import { getChatMemberIds, messageInclude, rowToEnvelope, summarizeReactions } from "./message-envelope.js";
 import { notifyMessagePush, previewTextFromCipher } from "./notify-push.js";
 import { instanceConfig } from "./instance-config.js";
 
@@ -309,15 +309,22 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
       return;
     }
 
-    const [rows, disclosures, tombstones] = await Promise.all([
+    const [rows, disclosures, tombstones, hiddenRows] = await Promise.all([
       prisma.message.findMany({
         where: { chatId },
         orderBy: { sentAt: "asc" },
         include: messageInclude
       }),
       prisma.messageDisclosure.findMany({ where: { chatId } }),
-      prisma.messageTombstone.findMany({ where: { chatId }, orderBy: { deletedAt: "asc" } })
+      prisma.messageTombstone.findMany({ where: { chatId }, orderBy: { deletedAt: "asc" } }),
+      prisma.messageHide.findMany({
+        where: { userId: viewerId, message: { chatId } },
+        select: { messageId: true }
+      })
     ]);
+
+    const hiddenMessageIds = new Set(hiddenRows.map((row) => row.messageId));
+    const visibleRows = rows.filter((row) => !hiddenMessageIds.has(row.id));
 
     const disclosureByMessage = new Map<string, MessageDisclosureMark>();
     for (const row of rows) {
@@ -340,7 +347,7 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
       }
     }
 
-    const envelopes = rows.map((row) =>
+    const envelopes = visibleRows.map((row) =>
       rowToEnvelope(row, viewerId, { disclosure: disclosureByMessage.get(row.id) })
     );
 
@@ -859,11 +866,23 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
       return;
     }
 
+    const scope = typeof req.query.scope === "string" ? req.query.scope : "everyone";
     const existing = await prisma.message.findFirst({ where: { id: messageId, chatId } });
     if (!existing || existing.deletedAt) {
       res.status(404).json({ error: "message_not_found" });
       return;
     }
+
+    if (scope === "self") {
+      await prisma.messageHide.upsert({
+        where: { messageId_userId: { messageId, userId } },
+        create: { messageId, userId },
+        update: { hiddenAt: new Date() }
+      });
+      res.json({ ok: true, scope: "self", chatId, messageId });
+      return;
+    }
+
     if (existing.senderId !== userId) {
       res.status(403).json({ error: "only_sender_can_delete" });
       return;
@@ -877,7 +896,7 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
     const envelope = rowToEnvelope(row, userId);
     const members = await getChatMemberIds(prisma, chatId);
     broadcastToUsers(members, { type: "message.deleted", payload: envelope });
-    res.json(envelope);
+    res.json({ ...envelope, scope: "everyone" });
   });
 
   app.put("/chats/:chatId/messages/:messageId/reactions", auth, async (req: AuthRequest, res) => {
@@ -924,9 +943,11 @@ export function registerMessageRoutes(app: express.Express, deps: Deps) {
 
     const reactions = await prisma.messageReaction.findMany({
       where: { messageId },
-      select: { emoji: true, userId: true }
+      select: { emoji: true, userId: true },
+      orderBy: { createdAt: "asc" }
     });
-    const payload = { chatId, messageId, reactions };
+    const summarized = summarizeReactions(reactions, userId);
+    const payload = { chatId, messageId, reactions: summarized };
     const members = await getChatMemberIds(prisma, chatId);
     broadcastToUsers(members, { type: "message.reactions", payload });
     res.json(payload);

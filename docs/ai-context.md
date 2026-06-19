@@ -98,6 +98,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `admin-panel-parity` | `in_progress` | `cursor:admin-panel-parity` | `2026-05-28` | `apps/admin`, `services/access-audit` admin auth/bootstrap parity | `feature/admin-panel-parity` | align admin UX with web auth and document first admin login |
 | `track-d-android-ui-shell` | `in_progress` | `cursor:android-ui-shell` | `2026-06-14` | `apps/android` Compose UI theme, auth, chat list, chat mock | `feature/track-d-android-ui-shell` | Phase 1: web-aligned design system + navigation shell |
 | `site-landing-distribution` | `done` | `cursor:site-landing` | `2026-06-17` | `apps/site`, `infra/nginx`, deploy docs | `feature/site-landing-distribution` | merged to develop @ ff7fdd3 |
+| `web-android-group-swagger` | `in_progress` | `cursor:web-android-group` | `2026-06-17` | `apps/web`, `apps/android`, `services/api-gateway`, OpenAPI | `feature/web-android-group-swagger` | group UX + Swagger + Android commits |
 
 ### Planned next (pick one track for new agents)
 
