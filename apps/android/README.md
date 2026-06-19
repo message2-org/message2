@@ -52,16 +52,35 @@ cd apps\android
 gradlew.bat --version
 ```
 
-## Phase 3 status (current)
+## Phase 3 status (current, `develop` @ PR #13)
 
 Native Compose shell aligned with `apps/web` colors and layout patterns:
 
-- **Auth** — login/register card, theme toggle, brand logo, session restore
-- **Chat list** — search, avatars with hash gradients, unread badges, E2EE label, load from API with mock fallback
-- **Chat** — message bubbles, real load/send via API, polling every 4s for near-realtime updates
+- **Auth** — login/register card, theme toggle, brand logo, session restore (`SessionStore`)
+- **Chat list** — search, avatars with hash gradients, unread badges, E2EE label, `GET /chats` with mock fallback
+- **Chat** — message bubbles, load/send via API, WebSocket + 4s polling fallback
 - **Theme** — dark default (purple accent), light (blue accent)
 
-Backend mode targets messaging service via emulator host bridge (`10.0.2.2`). When backend is unavailable, UI shows errors and falls back to mock data where possible.
+### API base URLs
+
+The app tries endpoints in order (`AuthApi.BASE_URLS`):
+
+1. `http://10.0.2.2:4000/messaging` — **API gateway** (emulator → host; preferred, matches web)
+2. `http://10.0.2.2:4001` — messaging service direct (fallback)
+3. `http://localhost:4000/messaging` / `:4001` — physical device via `adb reverse` or LAN
+
+Start backend: `pnpm infra:up` then `pnpm dev` (or `pnpm dev:backend:core` minimum).
+
+**Interactive API docs:** with gateway running, open [http://localhost:4000/docs](http://localhost:4000/docs) (Swagger UI). Machine-readable spec: `/openapi.json`. Source: `docs/openapi/message2-api.openapi.json`.
+
+When backend is unavailable, UI shows errors and falls back to mock data where possible.
+
+### Not yet implemented (vs web reference client)
+
+- Create group chat (`POST /chats` + `GET /discover`)
+- Profile/settings modals, stickers, media attachments, reactions
+- FCM push registration, E2EE prekeys, lawful transparency UX
+- Certificate pinning, biometric lock (planned under Security below)
 
 ## Modules (planned)
 

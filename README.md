@@ -13,7 +13,7 @@ Message2 (Russian locale name: "Послание2") is a modular messenger platf
 
 - Web messenger: React + TypeScript (`apps/web`)
 - Web admin console: React + TypeScript (`apps/admin`, :5174)
-- Planned Android app: Kotlin + Compose (`apps/android`)
+- Planned Android app: Kotlin + Compose (`apps/android`) — **Phase 3 MVP** on `develop` (auth, chats, messages)
 - Planned desktop: Tauri (or similar) over web UI — see `docs/product/client-platform-roadmap.md`
 - API and services: Node.js + TypeScript (`services/*`)
 - Local/dev deployment: Docker Compose (`infra/docker`)
@@ -25,7 +25,7 @@ Repository: [github.com/message2-org/message2](https://github.com/message2-org/m
 - `apps/web` - React web messenger (reference client)
 - `apps/site` - product landing + downloads catalog (RU/EN, light/dark)
 - `apps/admin` - instance admin / compliance console
-- `apps/android` - native Android client (Kotlin + Compose, stub)
+- `apps/android` - native Android client (Kotlin + Compose, Phase 3 MVP: auth + chats + messages)
 - `apps/desktop` / `apps/ios` - not started; roadmap in `docs/product/client-platform-roadmap.md`
 - `services/api-gateway` - API entrypoint and routing
 - `services/messaging` - users/chats/messages + realtime
@@ -172,7 +172,8 @@ See [docs/product/client-platform-roadmap.md](docs/product/client-platform-roadm
 - [ ] configurable auth providers (email/phone rules per deployment)
 - [ ] production-grade session/token management
 - [x] real push (Web Push + FCM legacy via `notifications`; set VAPID/FCM keys for production)
-- [ ] full Android client integration
+- [x] Android Phase 3 MVP (auth, chat list, messaging API; see `apps/android/README.md`)
+- [ ] Android full parity with web (groups, push, E2EE, media)
 - [ ] desktop packaging (Tauri: Linux/Windows/macOS)
 - [ ] release packaging and public install guide
 

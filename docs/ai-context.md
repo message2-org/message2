@@ -14,9 +14,10 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - Web client: `apps/web` (React + TypeScript + Vite) — **reference messenger** for API/WS integration.
 - Product landing / downloads: `apps/site` (static Vite, RU/EN, theme, `releases.json`) — served at `/` on every instance.
 - Web admin: `apps/admin` (React + Vite, :5174) — install wizard, complaints, encryption policy, SIEM export (lawful P4–P6 MVP).
-- Planned clients (not started): `apps/android` (Kotlin stub), `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
+- **Android client:** `apps/android` (Kotlin + Jetpack Compose) — **Phase 3 MVP** on `develop`: auth, chat list, messages (REST + WS/polling), mock fallback; gateway-first API (`10.0.2.2:4000/messaging`). Not started: group create UI, E2EE, push, lawful transparency UX.
+- Planned clients: `apps/desktop` / `apps/ios` — see `docs/product/client-platform-roadmap.md`.
 - Services: `services/api-gateway`, `services/messaging`, `services/media`, `services/notifications`, `services/access-audit`, `services/lawful-access`.
-- **Git:** default branch **`develop`** (GitHub) @ `ff7fdd3`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`. **CI on `develop` is green** (workflow: `pnpm install` → Prisma generate for access-audit, notifications, messaging → `pnpm build` → `pnpm test`).
+- **Git:** default branch **`develop`** (GitHub) @ `dbab5c9`; do not merge to **`main`** until a release milestone (web/Android/desktop). Synced with `origin/develop`. **CI on `develop` is green** (workflow: `pnpm install` → Prisma generate for access-audit, notifications, messaging → `pnpm build` → `pnpm test`).
 - **Integration:** merge to `develop` only after **green CI** on the PR (see `docs/ops/agent-coordination.md`, `docs/product/requirements.md`).
 - Current local run mode:
   - `pnpm install`
@@ -26,7 +27,8 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
   - Split backend: `pnpm dev:backend:core` (gateway + messaging) or `pnpm dev:backend` (all services)
   - Per-service: `pnpm dev:gateway`, `dev:messaging`, `dev:media`, `dev:notifications`, `dev:audit`, `dev:lawful`, `dev:admin` (:5174)
   - DB wipe (dev only): `pnpm db:reset` (Docker volume + migrations) or `pnpm db:clear` (Prisma reset, infra must be up)
-  - After pull: **`pnpm db:migrate:deploy`** (incl. `20260525200000_push_subscriptions`, `20260526120000_e2ee_prekeys`)
+  - After pull: **`pnpm db:migrate:deploy`** (incl. `20260525200000_push_subscriptions`, `20260526120000_e2ee_prekeys`, `20260617120000_message_hides`)
+- **API docs:** OpenAPI 3.0 at `docs/openapi/message2-api.openapi.json`; Swagger UI **`http://localhost:4000/docs`** (gateway).
 - Authentication baseline:
   - required: `username`, `password`
   - optional: `displayName`
@@ -76,6 +78,8 @@ Use this file as the mutable, up-to-date project context for any AI assistant.
 - [x] Track C: DM E2EE web wire (`e2ee_strict` text DMs, prekeys API, Double Ratchet); PR #5.
 - [x] Track C: media E2EE for web DM (`e2ee_strict` attachment envelope + client decrypt); PR #7.
 - [x] Repo hygiene: untrack committed `node_modules` / Vite cache paths (87 files); PR #8.
+- [x] Web group UX + OpenAPI Swagger UI + gateway WS proxy; PR #13 → `develop` @ `dbab5c9`.
+- [x] Android Phase 3 (Compose auth, chat list, messaging API); PR #13.
 
 ### Active work (claims) — multi-agent
 
@@ -96,9 +100,9 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 | `track-b-web-default-emoji-sticker-seed` | `in_progress` | `cursor:emoji-sticker-seed` | `2026-05-27` | `apps/web/src`, `services/messaging`, `packages/contracts` emoji/sticker API | `feature/track-b-web-default-emoji-sticker-seed` | seed default emoji + big and inline sticker presets |
 | `vkr-draft-pack` | `in_progress` | `cursor:vkr-draft-pack` | `2026-05-27` | `private/input`, `private/output` thesis docs/presentation drafts | `feature/vkr-draft-pack` | generate draft RPS/report/speech/slides from templates |
 | `admin-panel-parity` | `in_progress` | `cursor:admin-panel-parity` | `2026-05-28` | `apps/admin`, `services/access-audit` admin auth/bootstrap parity | `feature/admin-panel-parity` | align admin UX with web auth and document first admin login |
-| `track-d-android-ui-shell` | `in_progress` | `cursor:android-ui-shell` | `2026-06-14` | `apps/android` Compose UI theme, auth, chat list, chat mock | `feature/track-d-android-ui-shell` | Phase 1: web-aligned design system + navigation shell |
+| `track-d-android-ui-shell` | `done` | `cursor:android-ui-shell` | `2026-06-14` | `apps/android` Compose UI theme, auth, chat list, chat mock | `feature/track-d-android-ui-shell` | superseded by PR #13 Phase 3 API integration |
 | `site-landing-distribution` | `done` | `cursor:site-landing` | `2026-06-17` | `apps/site`, `infra/nginx`, deploy docs | `feature/site-landing-distribution` | merged to develop @ ff7fdd3 |
-| `web-android-group-swagger` | `in_progress` | `cursor:web-android-group` | `2026-06-17` | `apps/web`, `apps/android`, `services/api-gateway`, OpenAPI | `feature/web-android-group-swagger` | group UX + Swagger + Android commits |
+| `web-android-group-swagger` | `done` | `cursor:web-android-group` | `2026-06-17` | `apps/web`, `apps/android`, `services/api-gateway`, OpenAPI | `feature/web-android-group-swagger` | PR #13 merged to develop @ dbab5c9, CI green |
 
 ### Planned next (pick one track for new agents)
 
@@ -134,7 +138,8 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 
 **Track D — Native / desktop clients (after Track B push + stable web)**
 
-- [ ] Android (`apps/android` — Kotlin + Compose stub)
+- [x] Android Phase 3 MVP (`apps/android` — auth, chats, messages; PR #13)
+- [ ] Android parity: group create, discover, profile/settings, FCM push, E2EE, lawful transparency UX
 - [ ] Desktop Linux/Windows/macOS — default plan: **Tauri shell** over `apps/web` (`apps/desktop` TBD)
 - [ ] iOS (`apps/ios` TBD) — after Android integration patterns exist
 
@@ -166,6 +171,7 @@ See **`docs/ops/agent-coordination.md`**. Before coding: claim one row (`in_prog
 - 2026-05-26: Track C — DM E2EE prekeys API + web Double Ratchet wire (`e2ee_strict` text DMs); migration `20260526120000_e2ee_prekeys`; PR #5 → `develop`.
 - 2026-05-26: Track C — web media E2EE for DM in `e2ee_strict` (encrypted blob upload + client decrypt); PR #7 → `develop`.
 - 2026-06-17: `apps/site` landing (RU/EN, theme, releases.json) + nginx templates for `/` + `/app/` on every instance; merged to `develop` @ `ff7fdd3`.
+- 2026-06-17: PR #13 — web group UX, OpenAPI Swagger (`/docs`), Android Compose Phase 3, messaging `message_hides`; merged to `develop` @ `dbab5c9`, CI green.
 
 ## 6) Handoff for new Cursor / cloud agents
 
