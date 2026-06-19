@@ -48,7 +48,7 @@ type ChatApiResponseItem = {
   id: string;
   title: string;
   kind: "dm" | "group";
-  members: { id: string; displayName: string; username: string; lastReadAt?: string | null }[];
+  members: { id: string; displayName: string; username: string; avatarUrl?: string | null; lastReadAt?: string | null }[];
   peerUserId?: string;
   peerStatus?: "online" | "offline";
   lastDelivery?: "sent" | "read" | null;
@@ -62,6 +62,7 @@ type MessageApiResponseItem = {
   sentAt: string;
   kind?: string;
   senderDisplayName?: string;
+  senderAvatarUrl?: string | null;
   disclosure?: Message["disclosure"];
   isTombstone?: boolean;
   tombstoneLabel?: string;
@@ -304,6 +305,7 @@ async function requestMarkChatRead(accessToken: string, chatId: string) {
 async function requestChatTyping(accessToken: string, chatId: string, typing: boolean) {
   await requestWithAuth(`/chats/${chatId}/typing`, accessToken, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ typing })
   });
 }
@@ -311,23 +313,32 @@ async function requestChatTyping(accessToken: string, chatId: string, typing: bo
 async function requestEditMessage(accessToken: string, chatId: string, messageId: string, cipherText: string) {
   const response = await requestWithAuth(`/chats/${chatId}/messages/${messageId}`, accessToken, {
     method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cipherText })
   });
   if (!response.ok) throw new Error("edit_failed");
   return (await response.json()) as MessageApiResponseItem;
 }
 
-async function requestDeleteMessage(accessToken: string, chatId: string, messageId: string) {
-  const response = await requestWithAuth(`/chats/${chatId}/messages/${messageId}`, accessToken, {
+async function requestDeleteMessage(
+  accessToken: string,
+  chatId: string,
+  messageId: string,
+  scope: "self" | "everyone" = "everyone"
+) {
+  const response = await requestWithAuth(`/chats/${chatId}/messages/${messageId}?scope=${scope}`, accessToken, {
     method: "DELETE"
   });
   if (!response.ok) throw new Error("delete_failed");
-  return (await response.json()) as MessageApiResponseItem;
+  return (await response.json()) as
+    | MessageApiResponseItem
+    | { ok: true; scope: "self"; chatId: string; messageId: string };
 }
 
 async function requestToggleReaction(accessToken: string, chatId: string, messageId: string, emoji: string) {
   const response = await requestWithAuth(`/chats/${chatId}/messages/${messageId}/reactions`, accessToken, {
     method: "PUT",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ emoji })
   });
   if (!response.ok) throw new Error("reaction_failed");
@@ -565,14 +576,20 @@ async function requestUpdateProfile(accessToken: string, payload: ProfileUpdateP
 }
 
 function wsCandidates(accessToken: string) {
-  return API_BASE_URLS.map((baseUrl) => {
+  const token = encodeURIComponent(accessToken);
+  const fromApiBases = API_BASE_URLS.map((baseUrl) => {
     if (baseUrl.startsWith("/")) {
       const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-      return `${protocol}://${window.location.host}${baseUrl}/ws?token=${encodeURIComponent(accessToken)}`;
+      return `${protocol}://${window.location.host}${baseUrl}/ws?token=${token}`;
     }
     const wsBase = baseUrl.replace(/^http/, "ws");
-    return `${wsBase}/ws?token=${encodeURIComponent(accessToken)}`;
+    return `${wsBase}/ws?token=${token}`;
   });
+  // Local dev: messaging WS is on :4001/ws; try it first for faster connect via Vite.
+  if (import.meta.env.DEV) {
+    return [`ws://localhost:4001/ws?token=${token}`, ...fromApiBases];
+  }
+  return fromApiBases;
 }
 
 const bootAuth = getBootAuthState();
@@ -680,6 +697,13 @@ export default function App() {
       kind: chat.kind,
       peerUserId: chat.peerUserId ?? peer?.id,
       peerUsername: peer?.username,
+      peerAvatarUrl: peer?.avatarUrl ?? null,
+      members: chat.members.map((member) => ({
+        id: member.id,
+        displayName: member.displayName,
+        username: member.username,
+        avatarUrl: member.avatarUrl ?? null
+      })),
       name: chatName,
       status: chat.peerStatus === "online" ? "online" : "offline",
       lastMessage: last?.cipherText ? previewFromCipherText(last.cipherText, locale) : "",
@@ -788,6 +812,8 @@ export default function App() {
     return {
       id: message.id,
       sender: message.senderId === authUser?.id ? "me" : "them",
+      senderUserId: message.senderId,
+      senderAvatarUrl: message.senderAvatarUrl ?? null,
       author: message.senderId === authUser?.id ? authUser?.displayName ?? (locale === "ru" ? "Вы" : "You") : message.senderDisplayName ?? (locale === "ru" ? "Собеседник" : "Contact"),
       kind: message.kind ?? (parsedSticker ? "sticker" : parsedAttachment ? parsedAttachment.previewType : "text"),
       text: message.isDeleted ? deletedLabel : (parsedSticker ? stickerLabel : (parsedAttachment?.text ?? message.cipherText)),
@@ -825,6 +851,7 @@ export default function App() {
             reactions: message.reactions.map((r) => ({
               emoji: r.emoji,
               count: r.count,
+              userIds: r.userIds,
               reactedByMe: r.reactedByMe
             }))
           }
@@ -1439,6 +1466,7 @@ export default function App() {
                         reactions: (payload.reactions ?? []).map((r) => ({
                           emoji: r.emoji,
                           count: r.count,
+                          userIds: r.userIds,
                           reactedByMe: currentUserId ? r.userIds?.includes(currentUserId) : false
                         }))
                       }
@@ -1730,6 +1758,7 @@ export default function App() {
       locale={locale}
       theme={theme}
       authUser={authUser}
+      accessToken={session?.accessToken ?? null}
       userAvatar={userAvatarDisplay}
       userAvatarRef={userAvatar}
       isMenuOpen={isMenuOpen}
@@ -1786,6 +1815,25 @@ export default function App() {
           throw new Error(locale === "ru" ? "не удалось создать/открыть чат" : "failed to create/open chat");
         }
       }}
+      onCreateGroupChat={async (title, members) => {
+        if (members.length < 2) {
+          throw new Error(
+            locale === "ru" ? "Укажите минимум двух участников" : "Add at least two members"
+          );
+        }
+        const memberIds = members.map((member) => member.id);
+        const created = await runAuthorized((accessToken) =>
+          requestCreateChat(accessToken, { title, members: memberIds })
+        );
+        setActiveChatId(created.id);
+        void loadMessagesForChat(created.id);
+        const nextRows = await runAuthorized(requestChats);
+        setChats(nextRows.map(toChatItem));
+      }}
+      onSearchUsers={async (query) => {
+        const result = await runAuthorized((accessToken) => requestDiscover(accessToken, query));
+        return result.users;
+      }}
       onSearchChange={setSearch}
       replyTo={replyTo}
       onCancelReply={() => setReplyTo(null)}
@@ -1828,9 +1876,16 @@ export default function App() {
           [chatId]: (prev[chatId] ?? []).map((row) => (row.id === uiMessage.id ? uiMessage : row))
         }));
       }}
-      onDeleteMessage={async (chatId, messageId) => {
-        const updated = await runAuthorized((accessToken) => requestDeleteMessage(accessToken, chatId, messageId));
-        const uiMessage = toUiMessage(updated);
+      onDeleteMessage={async (chatId, messageId, scope) => {
+        const result = await runAuthorized((accessToken) => requestDeleteMessage(accessToken, chatId, messageId, scope));
+        if ("ok" in result && result.scope === "self") {
+          setMessagesByChat((prev) => ({
+            ...prev,
+            [chatId]: (prev[chatId] ?? []).filter((row) => row.id !== messageId)
+          }));
+          return;
+        }
+        const uiMessage = toUiMessage(result as MessageApiResponseItem);
         setMessagesByChat((prev) => ({
           ...prev,
           [chatId]: (prev[chatId] ?? []).map((row) => (row.id === uiMessage.id ? uiMessage : row))
@@ -1849,6 +1904,7 @@ export default function App() {
                   reactions: (result.reactions ?? []).map((r) => ({
                     emoji: r.emoji,
                     count: r.count,
+                    userIds: r.userIds,
                     reactedByMe: r.userIds?.includes(authUser.id)
                   }))
                 }

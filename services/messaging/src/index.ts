@@ -903,7 +903,7 @@ app.get("/chats", auth, async (req: AuthRequest, res) => {
       include: {
         members: {
           include: {
-            user: { select: { id: true, displayName: true, username: true } }
+            user: { select: { id: true, displayName: true, username: true, avatarUrl: true } }
           }
         },
         messages: { orderBy: { sentAt: "desc" }, take: 1, where: { deletedAt: null } }
@@ -935,6 +935,7 @@ app.get("/chats", auth, async (req: AuthRequest, res) => {
           id: member.user.id,
           displayName: member.user.displayName,
           username: member.user.username,
+          avatarUrl: member.user.avatarUrl,
           lastReadAt: member.lastReadAt?.toISOString() ?? null
         })),
         peerUserId: peerMember?.userId,

@@ -18,6 +18,7 @@ model User {
   chats          ChatMember[]
   sentMessages   Message[]         @relation("SenderMessages")
   messageReactions MessageReaction[]
+  messageHides     MessageHide[]
   refreshSession RefreshSession[]
   privateProfile UserPrivateProfile?
   transparencyNotices TransparencyUserNotice[]
@@ -65,6 +66,7 @@ model Message {
   replies          Message[] @relation("MessageReplies")
   disclosures      MessageDisclosure[]
   reactions        MessageReaction[]
+  hides            MessageHide[]
 
   @@index([chatId, sentAt(sort: Desc)])
   @@index([replyToMessageId])
@@ -82,6 +84,18 @@ model MessageReaction {
   @@id([messageId, userId])
   @@index([messageId])
   @@map("message_reactions")
+}
+
+model MessageHide {
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  hiddenAt  DateTime @default(now()) @map("hidden_at")
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@index([userId])
+  @@map("message_hides")
 }
 
 model MessageDisclosure {

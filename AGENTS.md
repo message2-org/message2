@@ -36,7 +36,7 @@ pnpm db:reset         # dev: wipe Docker DB volume + migrate
 | Package | Path | Port | Role |
 |---------|------|------|------|
 | `@message2/web` | `apps/web` | 5173 | React client |
-| `@message2/api-gateway` | `services/api-gateway` | 4000 | HTTP entry, proxy |
+| `@message2/api-gateway` | `services/api-gateway` | 4000 | HTTP entry, proxy; **Swagger UI** at `/docs`, spec at `/openapi.json` |
 | `@message2/messaging` | `services/messaging` | 4001 | Auth, chats, WS, Prisma |
 | `@message2/media` | `services/media` | 4002 | Uploads, MinIO |
 | `@message2/notifications` | `services/notifications` | 4003 | Web Push + FCM dispatch, subscription store |
